@@ -4,93 +4,365 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Dollar Bar Club — Austin’s Invite-Only Bar Passport</title>
-    <meta name="description" content="Invite-only locals program. One exclusive offer at 15 hand-selected Austin bars. Free for locals. Limited access." />
+    <meta
+      name="description"
+      content="Austin locals unlock complimentary drinks, BOGO specials, and neighborhood bar perks with a free digital passport."
+    />
     <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:0; background:#fff; color:#111; }
-      .wrap { max-width: 980px; margin: 0 auto; padding: 56px 20px; }
-      .badge { display:inline-block; padding:6px 10px; border:1px solid #e6e6e6; border-radius:999px; font-size:12px; color:#444; }
-      h1 { font-size: 44px; line-height: 1.05; margin: 14px 0 10px; }
-      p { font-size: 18px; color:#444; max-width: 58ch; }
-      .cardrow { display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 26px; }
-      .card { border:1px solid #eee; border-radius:18px; padding:16px; box-shadow: 0 8px 30px rgba(0,0,0,.04); }
-      .card h3 { margin:0 0 6px; font-size:16px; }
-      .card p { margin:0; font-size:14px; color:#555; }
-      .cta { margin-top: 26px; display:flex; gap: 10px; flex-wrap: wrap; }
-      input { padding: 14px 14px; border-radius: 999px; border: 1px solid #ddd; min-width: 260px; font-size: 14px; }
-      button { padding: 14px 16px; border-radius: 999px; border:0; background:#111; color:#fff; font-weight:600; cursor:pointer; }
-      .section { margin-top: 44px; padding-top: 10px; border-top: 1px solid #f0f0f0; }
-      .muted { font-size: 13px; color:#666; }
-      .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 14px; }
-      .faq { border:1px solid #eee; border-radius:14px; padding:14px; }
-      .faq h4 { margin:0 0 6px; font-size:14px; }
-      .faq p { margin:0; font-size:14px; color:#555; }
-      footer { margin-top: 46px; color:#666; font-size: 13px; }
-      a { color:#111; }
-      @media (max-width: 820px){
-        h1{ font-size: 36px; }
-        .cardrow{ grid-template-columns: 1fr; }
-        .grid2{ grid-template-columns: 1fr; }
+      :root {
+        --bg: #050805;
+        --surface: #0b140d;
+        --card: #102014;
+        --text: #e9ffe9;
+        --muted: #9ac59f;
+        --accent: #35d06f;
+        --accent-dark: #23a955;
+        --border: rgba(89, 173, 109, 0.32);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        background: radial-gradient(circle at top, #0f2813 0%, var(--bg) 48%);
+        color: var(--text);
+      }
+
+      img {
+        max-width: 100%;
+        display: block;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .wrap {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 0 20px 60px;
+      }
+
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        backdrop-filter: blur(10px);
+        background: rgba(5, 10, 6, 0.9);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .nav-inner {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .logo {
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .nav-btn,
+      .primary-btn {
+        border: 0;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #041006;
+        font-weight: 700;
+        font-size: 14px;
+        padding: 12px 18px;
+        cursor: pointer;
+      }
+
+      .nav-btn:hover,
+      .primary-btn:hover {
+        background: var(--accent-dark);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 24px;
+        padding-top: 40px;
+        align-items: center;
+      }
+
+      .badge {
+        display: inline-flex;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 14px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        line-height: 1.05;
+        font-size: clamp(32px, 6vw, 56px);
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 18px;
+        max-width: 56ch;
+      }
+
+      .hero-cta {
+        margin-top: 24px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .hero-photo {
+        border-radius: 24px;
+        border: 1px solid var(--border);
+        min-height: 360px;
+        background: linear-gradient(160deg, rgba(53, 208, 111, 0.34), rgba(6, 24, 10, 0.5)),
+          url("https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=1200&q=80") center/cover;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      }
+
+      .section {
+        margin-top: 54px;
+      }
+
+      h2 {
+        margin: 0 0 10px;
+        font-size: clamp(26px, 3.6vw, 36px);
+      }
+
+      .section-lead {
+        color: var(--muted);
+        margin: 0;
+      }
+
+      .steps,
+      .benefits,
+      .partners {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+      }
+
+      .partners {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        background: var(--card);
+        border-radius: 18px;
+        padding: 18px;
+      }
+
+      .icon {
+        font-size: 22px;
+        margin-bottom: 8px;
+      }
+
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 17px;
+      }
+
+      .card p {
+        margin: 0;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .partners .card {
+        min-height: 128px;
+        background: linear-gradient(135deg, rgba(53, 208, 111, 0.12), rgba(12, 50, 20, 0.55));
+      }
+
+      .form-box {
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        border-radius: 20px;
+        padding: 18px;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr auto;
+        gap: 10px;
+      }
+
+      input {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: #071008;
+        color: var(--text);
+        padding: 12px;
+        font-size: 14px;
+      }
+
+      .quote {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      footer {
+        margin-top: 44px;
+        border-top: 1px solid var(--border);
+        padding-top: 20px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .steps,
+        .benefits,
+        .partners,
+        .form-box {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-photo {
+          min-height: 280px;
+        }
+
+        .nav-btn,
+        .primary-btn {
+          width: 100%;
+        }
+
+        .nav-inner {
+          align-items: stretch;
+          flex-direction: column;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <span class="badge">Invite-Only • Austin</span>
-      <h1>Austin’s Invite-Only Bar Passport</h1>
-      <p>One exclusive offer at 15 hand-selected bars. Free for locals. Limited access.</p>
-
-      <div class="cta" id="signup">
-        <input type="email" placeholder="Enter your email" />
-        <button type="button">Request Invite</button>
-        <span class="muted">Early access rolls out in batches.</span>
+    <nav class="nav">
+      <div class="nav-inner">
+        <div class="logo">Dollar Bar Club</div>
+        <button class="nav-btn" type="button" onclick="document.getElementById('claim').scrollIntoView({behavior: 'smooth'})">
+          Claim Your Digital Passport
+        </button>
       </div>
+    </nav>
 
-      <div class="cardrow">
-        <div class="card">
-          <h3>Get Approved</h3>
-          <p>Request access and unlock your digital pass inside the app.</p>
-        </div>
-        <div class="card">
-          <h3>Unlock 15 Exclusive Offers</h3>
-          <p>One curated offer per bar — no oversaturation.</p>
-        </div>
-        <div class="card">
-          <h3>Discover What’s Nearby</h3>
-          <p>Real-time bar insights powered by BarGlance.</p>
-        </div>
-      </div>
-
-      <div class="section" id="bars">
-        <h2>For Austin Bar Owners</h2>
-        <p>Dollar Bar Club drives qualified local foot traffic during key windows — at zero upfront cost. Participating bars choose an offer aligned with margins and brand.</p>
-        <p class="muted">Email: <a href="mailto:hello@dollarbarclub.com">hello@dollarbarclub.com</a></p>
-      </div>
-
-      <div class="section">
-        <h2>FAQ</h2>
-        <div class="grid2">
-          <div class="faq">
-            <h4>Is it really free?</h4>
-            <p>Yes — there’s no cost for locals during the initial rollout.</p>
-          </div>
-          <div class="faq">
-            <h4>Is this a coupon app?</h4>
-            <p>No. It’s curated and neighborhood-limited to avoid oversaturation.</p>
-          </div>
-          <div class="faq">
-            <h4>What kind of offers?</h4>
-            <p>Each bar controls its offer (discounted drink, time-window special, etc.).</p>
-          </div>
-          <div class="faq">
-            <h4>Powered by BarGlance?</h4>
-            <p>Yes — Dollar Bar Club is built on the BarGlance nightlife platform.</p>
+    <main class="wrap">
+      <section class="hero">
+        <div>
+          <span class="badge">Invite-Only • Austin, TX</span>
+          <h1>The Key to Austin’s Best Bars—Free for Locals.</h1>
+          <p>
+            Unlock Buy One, Get One cocktails, complimentary signature pours, and neighborhood-only perks at hand-selected
+            Austin bars.
+          </p>
+          <div class="hero-cta">
+            <button class="primary-btn" type="button" onclick="document.getElementById('claim').scrollIntoView({behavior: 'smooth'})">
+              Claim Your Digital Passport
+            </button>
+            <span class="muted">Verified via Austin zip code • 100% free for locals</span>
           </div>
         </div>
-      </div>
+        <div class="hero-photo" role="img" aria-label="Signature cocktail from an Austin partner bar"></div>
+      </section>
+
+      <section class="section">
+        <h2>How It Works</h2>
+        <p class="section-lead">From signup to your first reward in under a minute.</p>
+        <div class="steps">
+          <article class="card">
+            <div class="icon">📱</div>
+            <h3>1. Sign Up</h3>
+            <p>Enter your email and Austin zip code to verify local status and receive your digital invite.</p>
+          </article>
+          <article class="card">
+            <div class="icon">📍</div>
+            <h3>2. Explore</h3>
+            <p>Browse hand-selected spots, from hidden speakeasies to iconic rooftops, all in one passport.</p>
+          </article>
+          <article class="card">
+            <div class="icon">🥂</div>
+            <h3>3. Redeem</h3>
+            <p>Show your digital pass at the bar to instantly unlock your local reward.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Where Your Passport Takes You</h2>
+        <p class="section-lead">A sample of partner-caliber bars Austin locals can unlock.</p>
+        <div class="partners">
+          <article class="card">
+            <h3>Small Victory</h3>
+            <p>Classic cocktails in a polished downtown hideaway.</p>
+          </article>
+          <article class="card">
+            <h3>Roosevelt Room</h3>
+            <p>Award-winning menu and elevated date-night atmosphere.</p>
+          </article>
+          <article class="card">
+            <h3>Nickel City</h3>
+            <p>Neighborhood favorite energy with serious drink quality.</p>
+          </article>
+          <article class="card">
+            <h3>Zanzibar</h3>
+            <p>Rooftop views and tropical-forward signature pours.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Why Join the Passport?</h2>
+        <div class="benefits">
+          <article class="card">
+            <h3>Local Rewards</h3>
+            <p>Enjoy tangible offers like Buy One, Get One drinks or complimentary pours.</p>
+          </article>
+          <article class="card">
+            <h3>Zero Cost</h3>
+            <p>Membership is free for verified Austin residents during the invite rollout.</p>
+          </article>
+          <article class="card">
+            <h3>Curated Only</h3>
+            <p>No chains. No tourist traps. Just Austin bars worth your night out.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="claim">
+        <h2>Ready to start your crawl?</h2>
+        <p class="section-lead">Join 2,000+ Austin locals already waiting for launch access.</p>
+        <div class="form-box">
+          <input type="text" placeholder="Name" aria-label="Name" />
+          <input type="email" placeholder="Email" aria-label="Email" />
+          <input type="text" placeholder="Austin Zip Code" aria-label="Austin zip code" />
+          <button class="primary-btn" type="button">Get My Free Passport</button>
+        </div>
+        <p class="quote">“This makes finding a great nearby bar perk effortless.” — Austin Foodie Insider</p>
+      </section>
 
       <footer>
-        Austin, Texas • Powered by BarGlance • <a href="mailto:hello@dollarbarclub.com">hello@dollarbarclub.com</a>
+        Austin, Texas • Invite-only locals program • Contact: <a href="mailto:hello@dollarbarclub.com">hello@dollarbarclub.com</a>
       </footer>
-    </div>
+    </main>
   </body>
 </html>

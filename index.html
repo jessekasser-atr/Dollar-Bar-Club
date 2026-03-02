@@ -356,6 +356,8 @@
           <input type="email" placeholder="Email" aria-label="Email" />
           <input type="text" placeholder="Austin Zip Code" aria-label="Austin zip code" />
           <button class="primary-btn" type="button">Get My Free Passport</button>
+          
+          <p id="formMessage" style="margin-top:12px;"></p>
         </div>
         <p class="quote">“This makes finding a great nearby bar perk effortless.” — Austin Foodie Insider</p>
       </section>
@@ -364,5 +366,62 @@
         Austin, Texas • Invite-only locals program • Contact: <a href="mailto:hello@dollarbarclub.com">hello@dollarbarclub.com</a>
       </footer>
     </main>
+  <script>
+  const form = document.querySelector('form');
+  const msg = document.getElementById('formMessage');
+
+  async function getCoords() {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) return resolve({ locationDenied: true });
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          locationDenied: false
+        }),
+        () => resolve({ locationDenied: true }),
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+      );
+    });
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const email = form.querySelector('input[type="email"]').value.trim();
+    const zip = form.querySelector('input[type="text"]').value.trim();
+
+    msg.textContent = "Submitting...";
+    msg.style.color = "#b7ffcf";
+
+    const coords = await getCoords();
+
+    try {
+      const res = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, zip, ...coords })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        msg.textContent = data?.error || "Something went wrong.";
+        msg.style.color = "#ffb7b7";
+        return;
+      }
+
+      msg.textContent = "You’re in. Check your email.";
+      msg.style.color = "#b7ffcf";
+      form.reset();
+    } catch (err) {
+      msg.textContent = "Network error. Try again.";
+      msg.style.color = "#ffb7b7";
+    }
+  });
+</script>
+
+</body>
+</html>
   </body>
 </html>

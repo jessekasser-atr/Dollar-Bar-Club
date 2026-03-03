@@ -366,78 +366,80 @@
         Austin, Texas • Invite-only locals program • Contact: <a href="mailto:hello@dollarbarclub.com">hello@dollarbarclub.com</a>
       </footer>
     </main>
-  <script>
+</main>
+
 <script>
-  const form = document.getElementById('passportForm');
-  const msg = document.getElementById('formMessage');
+  // Wait until the page HTML is loaded
+  window.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('passportForm');
+    const msg = document.getElementById('formMessage');
 
-  const fullNameEl = document.getElementById('fullName');
-  const emailEl = document.getElementById('email');
-  const zipEl = document.getElementById('zip');
+    if (!form) return;
 
-  function setMessage(text, isError = false) {
-    msg.textContent = text;
-    msg.style.color = isError ? '#ffb4b4' : '#b6ffb6';
-  }
+    const fullNameEl = document.getElementById('fullName');
+    const emailEl = document.getElementById('email');
+    const zipEl = document.getElementById('zip');
 
-  async function getCoordsIfAllowed() {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) return resolve(null);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-        () => resolve(null),
-        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
-      );
-    });
-  }
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const fullName = (fullNameEl.value || '').trim();
-    const email = (emailEl.value || '').trim();
-    const zip = (zipEl.value || '').trim();
-
-    if (!email || !zip) {
-      setMessage('Please enter your email + Austin zip code.', true);
-      return;
+    function setMessage(text, isError = false) {
+      if (!msg) return;
+      msg.textContent = text;
+      msg.style.color = isError ? '#ff4b4b' : '#b6ffb6';
     }
 
-    setMessage('Submitting…');
-
-    const coords = await getCoordsIfAllowed();
-
-    try {
-      const res = await fetch('/api/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName,
-          email,
-          zip,
-          // optional location fields (your API can ignore if null)
-          lat: coords ? coords.lat : null,
-          lon: coords ? coords.lon : null
-        })
+    async function getCoordsIfAllowed() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve(null);
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+          () => resolve(null),
+          { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+        );
       });
+    }
 
-      const data = await res.json().catch(() => ({}));
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault(); // prevents the page from jumping to the top
+      setMessage('Submitting...');
 
-      if (!res.ok) {
-        setMessage(data.error || 'Signup failed. Try again.', true);
+      const fullName = (fullNameEl?.value || '').trim();
+      const email = (emailEl?.value || '').trim();
+      const zip = (zipEl?.value || '').trim();
+
+      if (!email || !zip) {
+        setMessage('Please enter email + Austin zip code.', true);
         return;
       }
 
-      setMessage('✅ You’re on the list! Check your email soon.');
-      form.reset();
-    } catch (err) {
-      setMessage('Network error. Please try again.', true);
-    }
+      const coords = await getCoordsIfAllowed();
+
+      try {
+        const res = await fetch('/api/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName,
+            email,
+            zip,
+            lat: coords ? coords.lat : null,
+            lon: coords ? coords.lon : null
+          })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setMessage(data.error || 'Signup failed. Try again.', true);
+          return;
+        }
+
+        setMessage("✅ You're on the list!");
+        form.reset();
+      } catch (err) {
+        setMessage('Network error. Please try again.', true);
+      }
+    });
   });
-</script>
 </script>
 
 </body>
-</html>
-  </body>
 </html>

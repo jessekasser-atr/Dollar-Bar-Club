@@ -351,14 +351,14 @@
       <section class="section" id="claim">
         <h2>Ready to start your crawl?</h2>
         <p class="section-lead">Join 2,000+ Austin locals already waiting for launch access.</p>
-        <div class="form-box">
-          <input type="text" placeholder="Name" aria-label="Name" />
-          <input type="email" placeholder="Email" aria-label="Email" />
-          <input type="text" placeholder="Austin Zip Code" aria-label="Austin zip code" />
-          <button class="primary-btn" type="button">Get My Free Passport</button>
-          
-          <p id="formMessage" style="margin-top:12px;"></p>
-        </div>
+  <form id="passportForm" class="form-box">
+  <input id="fullName" type="text" placeholder="Name" aria-label="Name" />
+  <input id="email" type="email" placeholder="Email" aria-label="Email" />
+  <input id="zip" type="text" placeholder="Austin Zip Code" aria-label="Austin zip code" />
+  <button class="primary-btn" type="submit">Get My Free Passport</button>
+
+  <p id="formMessage" style="margin-top:12px;"></p>
+</form>
         <p class="quote">“This makes finding a great nearby bar perk effortless.” — Austin Foodie Insider</p>
       </section>
 
@@ -367,20 +367,26 @@
       </footer>
     </main>
   <script>
-  const form = document.querySelector('form');
+<script>
+  const form = document.getElementById('passportForm');
   const msg = document.getElementById('formMessage');
 
-  async function getCoords() {
+  const fullNameEl = document.getElementById('fullName');
+  const emailEl = document.getElementById('email');
+  const zipEl = document.getElementById('zip');
+
+  function setMessage(text, isError = false) {
+    msg.textContent = text;
+    msg.style.color = isError ? '#ffb4b4' : '#b6ffb6';
+  }
+
+  async function getCoordsIfAllowed() {
     return new Promise((resolve) => {
-      if (!navigator.geolocation) return resolve({ locationDenied: true });
+      if (!navigator.geolocation) return resolve(null);
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          locationDenied: false
-        }),
-        () => resolve({ locationDenied: true }),
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+        (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
       );
     });
   }
@@ -388,37 +394,47 @@
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const email = form.querySelector('input[type="email"]').value.trim();
-    const zip = form.querySelector('input[type="text"]').value.trim();
+    const fullName = (fullNameEl.value || '').trim();
+    const email = (emailEl.value || '').trim();
+    const zip = (zipEl.value || '').trim();
 
-    msg.textContent = "Submitting...";
-    msg.style.color = "#b7ffcf";
+    if (!email || !zip) {
+      setMessage('Please enter your email + Austin zip code.', true);
+      return;
+    }
 
-    const coords = await getCoords();
+    setMessage('Submitting…');
+
+    const coords = await getCoordsIfAllowed();
 
     try {
-      const res = await fetch("/api/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, zip, ...coords })
+      const res = await fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName,
+          email,
+          zip,
+          // optional location fields (your API can ignore if null)
+          lat: coords ? coords.lat : null,
+          lon: coords ? coords.lon : null
+        })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        msg.textContent = data?.error || "Something went wrong.";
-        msg.style.color = "#ffb7b7";
+        setMessage(data.error || 'Signup failed. Try again.', true);
         return;
       }
 
-      msg.textContent = "You’re in. Check your email.";
-      msg.style.color = "#b7ffcf";
+      setMessage('✅ You’re on the list! Check your email soon.');
       form.reset();
     } catch (err) {
-      msg.textContent = "Network error. Try again.";
-      msg.style.color = "#ffb7b7";
+      setMessage('Network error. Please try again.', true);
     }
   });
+</script>
 </script>
 
 </body>

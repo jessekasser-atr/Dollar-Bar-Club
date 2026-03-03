@@ -351,6 +351,9 @@
       <section class="section" id="claim">
         <h2>Ready to start your crawl?</h2>
         <p class="section-lead">Join 2,000+ Austin locals already waiting for launch access.</p>
+        <p class="section-lead" style="opacity:.85; margin-top:6px;">
+  Live waitlist: <span id="waitlistCount">...</span>
+</p>
   <form id="passportForm" class="form-box">
   <input id="fullName" type="text" placeholder="Name" aria-label="Name" />
   <input id="email" type="email" placeholder="Email" aria-label="Email" />
@@ -373,7 +376,22 @@
   window.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('passportForm');
     const msg = document.getElementById('formMessage');
+const waitlistCountEl = document.getElementById('waitlistCount');
 
+async function refreshWaitlistCount() {
+  if (!waitlistCountEl) return;
+  try {
+    const r = await fetch('/api/stats');
+    const j = await r.json();
+    if (r.ok && typeof j.waitlistCount === 'number') {
+      waitlistCountEl.textContent = j.waitlistCount.toLocaleString();
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+refreshWaitlistCount();
     if (!form) return;
 
     const fullNameEl = document.getElementById('fullName');

@@ -1,3 +1,42 @@
+async function sendConfirmationEmail({ to, zip }) {
+  const RESEND_API_KEY = process.env.RESEND_API_KEY;
+  const FROM_EMAIL = process.env.FROM_EMAIL || "onboarding@resend.dev";
+  const APP_DOWNLOAD_URL = process.env.APP_DOWNLOAD_URL || "https://barglance.com";
+
+  if (!RESEND_API_KEY) return;
+
+  const subject = "You’re on the Dollar Bar Club list ✅";
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.4">
+      <h2>You're on the list ✅</h2>
+      <p>We got your signup${zip ? ` (ZIP ${zip})` : ""}.</p>
+      <p>When your digital passport is ready, you’ll get an invite link here.</p>
+      <p style="margin-top:18px">
+        <a href="${APP_DOWNLOAD_URL}" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#22c55e;color:#000;text-decoration:none;font-weight:700">
+          Open BarGlance
+        </a>
+      </p>
+      <p style="margin-top:18px;font-size:12px;opacity:.75">
+        Dollar Bar Club • Austin, TX
+      </p>
+    </div>
+  `;
+
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: FROM_EMAIL,
+      to,
+      subject,
+      html,
+    }),
+  });
+}
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -56,7 +95,7 @@ module.exports = async function handler(req, res) {
         details: text,
       });
     }
-
+sendConfirmationEmail({ to: email, zip }).catch(() => {});
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error(err);

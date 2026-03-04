@@ -9,7 +9,7 @@ const supabase = createClient(
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 module.exports = async (req, res) => {
-  // Handle preflight (sometimes needed)
+  // Preflight
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method !== 'POST') {
@@ -23,50 +23,18 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // 1) Save to Supabase
-    const { error: insertError } = await supabase.from('bar_signups').insert([
-      {
-        bar_name: String(barName).trim(),
-        manager_name: String(managerName).trim(),
-        bar_phone: String(barPhone).trim(),
-        bar_email: String(barEmail).trim(),
-      },
-    ]);
-
-const { createClient } = require('@supabase/supabase-js');
-const { Resend } = require('resend');
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-module.exports = async (req, res) => {
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  try {
-    const { barName, managerName, barPhone, barEmail } = req.body || {};
-
-    if (!barName || !managerName || !barPhone || !barEmail) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
+    const clean = {
+      bar_name: String(barName).trim(),
+      manager_name: String(managerName).trim(),
+      bar_phone: String(barPhone).trim(),
+      bar_email: String(barEmail).trim(),
+    };
 
     // 1) Save to Supabase
-    const { error: insertError } = await supabase.from('bar_signups').insert([
-      {
-        bar_name: String(barName).trim(),
-        manager_name: String(managerName).trim(),
-        bar_phone: String(barPhone).trim(),
-        bar_email: String(barEmail).trim(),
-      },
-    ]);
+    const { error: insertError } = await supabase.from('bar_signups').insert([clean]);
 
-    // If duplicate submission, treat as success (they're already in Supabase)
     if (insertError) {
-      const msg = (insertError.message || '').toLowerCase();
+      const msg = String(insertError.message || '').toLowerCase();
 
       const isDuplicate =
         msg.includes('duplicate key value') ||
@@ -81,7 +49,7 @@ module.exports = async (req, res) => {
         });
       }
 
-      // ✅ Duplicate: return success + friendly message and STOP (no extra emails)
+      // Duplicate: succeed, don’t spam emails
       return res.status(200).json({
         ok: true,
         duplicate: true,
@@ -92,43 +60,45 @@ module.exports = async (req, res) => {
     const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
     const alertEmail = process.env.BAR_ALERT_EMAIL || 'dollarbarclub@gmail.com';
 
-    // 2) Confirmation to bar
+    // 2) Confirmation email to bar
     const confirm = await resend.emails.send({
       from: fromEmail,
-      to: String(barEmail).trim(),
+      to: clean.bar_email,
       subject: 'Dollar Bar Club — Submission Received',
-      html: `<p>Thanks — we got your submission for <strong>${String(barName).trim()}</strong>. We’ll follow up shortly.</p>`,
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height:1.6;">
+          <p>Thanks — we got your submission for <strong>${clean.bar_name}</strong>.</p>
+          <p>We’ll follow up shortly.</p>
+          <hr style="margin:16px 0;" />
+          <p style="font-size:12px;color:#555;">(This is an automated confirmation.)</p>
+        </div>
+      `,
     });
 
     if (confirm?.error) {
-      return res.status(500).json({ step: 'resend_confirm', error: confirm.error });
+      return res.status(500).json({ step: 'resend_confirm', error: String(confirm.error) });
     }
 
-    // 3) Alert to Dollar Bar Club
+    // 3) Notification email to Dollar Bar Club
     const alert = await resend.emails.send({
       from: fromEmail,
       to: alertEmail,
-      subject: `🚨 New Bar Signup: ${String(barName).trim()}`,
+      subject: `🚨 New Bar Signup: ${clean.bar_name}`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height:1.6;">
-          <h2 style="color:#16a34a;">New Bar Signup Submitted</h2>
-
-          <p><strong>Bar Name:</strong><br>${String(barName).trim()}</p>
-          <p><strong>Manager Name:</strong><br>${String(managerName).trim()}</p>
-          <p><strong>Contact Phone:</strong><br>${String(barPhone).trim()}</p>
-          <p><strong>Email:</strong><br>${String(barEmail).trim()}</p>
-
+          <h2 style="color:#16a34a;margin:0 0 10px;">New Bar Signup Submitted</h2>
+          <p><strong>Bar Name:</strong><br>${clean.bar_name}</p>
+          <p><strong>Manager Name:</strong><br>${clean.manager_name}</p>
+          <p><strong>Contact Phone:</strong><br>${clean.bar_phone}</p>
+          <p><strong>Email:</strong><br>${clean.bar_email}</p>
           <hr style="margin:20px 0;" />
-
-          <p style="font-size:12px;color:#555;">
-            Submitted at: ${new Date().toLocaleString()}
-          </p>
+          <p style="font-size:12px;color:#555;">Submitted at: ${new Date().toLocaleString()}</p>
         </div>
       `,
     });
 
     if (alert?.error) {
-      return res.status(500).json({ step: 'resend_alert', error: alert.error });
+      return res.status(500).json({ step: 'resend_alert', error: String(alert.error) });
     }
 
     return res.status(200).json({ ok: true });

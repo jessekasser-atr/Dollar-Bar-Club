@@ -30,53 +30,60 @@ module.exports = async (req, res) => {
     const alertEmail = process.env.BAR_ALERT_EMAIL || 'dollarbarclub@gmail.com';
 
     // 1) Save to Supabase
-    let wasDuplicate = false;
-
+    let duplicate = false;
     const { error: insertError } = await supabase.from('bar_signups').insert([clean]);
 
     if (insertError) {
       const msg = (insertError.message || '').toLowerCase();
-      wasDuplicate =
+      duplicate =
         msg.includes('duplicate key value') ||
         msg.includes('already exists') ||
         msg.includes('unique constraint') ||
         msg.includes('bar_signups_unique');
 
-      if (!wasDuplicate) {
-        return res.status(500).json({
-          step: 'supabase_insert',
-          error: insertError.message,
-        });
+      if (!duplicate) {
+        return res.status(500).json({ step: 'supabase_insert', error: insertError.message });
       }
-      // If duplicate, continue (we still want to email DollarBarClub)
+      // If duplicate, continue (don’t return) so emails still send
     }
 
-    // 2) Confirmation email to bar (ONLY if not duplicate)
-    if (!wasDuplicate) {
-      const confirm = await resend.emails.send({
-        from: fromEmail,
-        to: clean.bar_email,
-        subject: 'Dollar Bar Club — Submission Received',
-        html: `<p>Thanks — we got your submission for <strong>${clean.bar_name}</strong>. We’ll follow up shortly.</p>`,
-      });
+    // 2) Confirmation to bar (ALWAYS)
+    const confirm = await resend.emails.send({
+      from: fromEmail,
+      to: clean.bar_email,
+      subject: duplicate
+        ? 'Dollar Bar Club — Submission Already Received'
+        : 'Dollar Bar Club — Submission Received',
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height:1.6;">
+          <p>Thanks — we got your submission for <strong>${clean.bar_name}</strong>.</p>
+          <p>${duplicate ? "It looks like we already had this on file, but you're all set." : "We’ll follow up shortly."}</p>
+          <hr style="margin:16px 0;" />
+          <p style="font-size:12px;color:#555;">(This is an automated confirmation.)</p>
+        </div>
+      `,
+    });
 
-      if (confirm?.error) {
-        return res.status(500).json({ step: 'resend_confirm', error: String(confirm.error) });
-      }
+    if (confirm?.error) {
+      return res.status(500).json({ step: 'resend_confirm', error: String(confirm.error) });
     }
 
-    // 3) Notification email to Dollar Bar Club (ALWAYS)
+    // 3) Admin email to DollarBarClub (ALWAYS — tweak if you want only new)
     const alert = await resend.emails.send({
       from: fromEmail,
       to: alertEmail,
-      subject: `${wasDuplicate ? '⚠️ Duplicate' : '🚨 New'} Bar Signup: ${clean.bar_name}`,
+      subject: duplicate
+        ? `⚠️ Duplicate Bar Signup: ${clean.bar_name}`
+        : `🚨 New Bar Signup: ${clean.bar_name}`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height:1.6;">
-          <h2 style="color:#16a34a;">${wasDuplicate ? 'Duplicate Bar Signup' : 'New Bar Signup Submitted'}</h2>
+          <h2 style="color:#16a34a;">${duplicate ? 'Duplicate Bar Signup' : 'New Bar Signup Submitted'}</h2>
+
           <p><strong>Bar Name:</strong><br>${clean.bar_name}</p>
           <p><strong>Manager Name:</strong><br>${clean.manager_name}</p>
           <p><strong>Contact Phone:</strong><br>${clean.bar_phone}</p>
           <p><strong>Email:</strong><br>${clean.bar_email}</p>
+
           <hr style="margin:20px 0;" />
           <p style="font-size:12px;color:#555;">Submitted at: ${new Date().toLocaleString()}</p>
         </div>
@@ -89,10 +96,10 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({
       ok: true,
-      duplicate: wasDuplicate,
-      message: wasDuplicate
-        ? "✅ We already have your submission — we’ll follow up soon."
-        : "✅ You're on the list!",
+      duplicate,
+      message: duplicate
+        ? "✅ Already received — confirmation sent again."
+        : "✅ Submitted — confirmation sent.",
     });
   } catch (err) {
     return res.status(500).json({

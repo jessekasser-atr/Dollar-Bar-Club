@@ -254,18 +254,19 @@
           flex-direction: column;
         }
       }
-      .powered-by {
+.powered-by {
   width: 100%;
   text-align: center;
-  padding: 8px 0;
-  background: rgba(0, 255, 140, 0.08);
-  font-size: 14px;
+  padding: 14px 0;
+  background: rgba(0, 255, 140, 0.10);
+  font-size: 20px;
   letter-spacing: 0.5px;
+  font-weight: 700;
 }
 
 .powered-by a {
   text-decoration: none;
-  font-weight: 600;
+  font-weight: inherit;
   color: #8affc1;
   transition: opacity 0.2s ease;
 }
@@ -273,14 +274,19 @@
 .powered-by a:hover {
   opacity: 0.7;
 }
+
+.powered-by .brand {
+  font-size: 24px;
+  font-weight: 900;
+}
     </style>
   </head>
   <body>
-    <div class="powered-by">
-    <a href="https://www.barglance.com/" target="_blank" rel="noopener noreferrer">
-      &#9889; Powered by BarGlance
-    </a>
-  </div>
+<div class="powered-by">
+  <a href="https://www.barglance.com/" target="_blank" rel="noopener noreferrer">
+    &#9889; Powered by <span class="brand">BarGlance</span>
+  </a>
+</div>
 
     <nav class="nav">
       <div class="nav-inner">

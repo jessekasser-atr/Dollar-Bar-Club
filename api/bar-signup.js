@@ -33,12 +33,34 @@ module.exports = async (req, res) => {
       },
     ]);
 
-    if (insertError) {
-      return res.status(500).json({
-        step: 'supabase_insert',
-        error: insertError.message,
-      });
-    }
+// If duplicate submission, treat as success (they're already in Supabase)
+if (insertError) {
+  const msg = (insertError.message || '').toLowerCase();
+
+  const isDuplicate =
+    msg.includes('duplicate key value') ||
+    msg.includes('already exists') ||
+    msg.includes('unique constraint') ||
+    msg.includes('bar_signups_unique');
+
+  if (!isDuplicate) {
+    return res.status(500).json({
+      step: 'supabase_insert',
+      error: insertError.message,
+    });
+  }
+
+  // ✅ Duplicate: return success + friendly message and STOP (no extra emails)
+  return res.status(200).json({
+    ok: true,
+    duplicate: true,
+    message: "✅ We already have your submission — we’ll follow up soon."
+  });
+}
+
+  // Duplicate: don't fail the user
+  // (Optional) you can still send the alert email below if you want
+}
 
     const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
     const alertEmail = process.env.BAR_ALERT_EMAIL || 'dollarbarclub@gmail.com';

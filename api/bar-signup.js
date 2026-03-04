@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-import { Resend } from 'resend';
+const { createClient } = require('@supabase/supabase-js');
+const { Resend } = require('resend');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -8,86 +8,75 @@ const supabase = createClient(
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+module.exports = async (req, res) => {
+  // Handle preflight (sometimes needed)
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
   try {
     const { barName, managerName, barPhone, barEmail } = req.body || {};
+
     if (!barName || !managerName || !barPhone || !barEmail) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // ---- Step A: sanity check env vars (don’t print secrets)
-    const envCheck = {
-      hasSupabaseUrl: !!process.env.SUPABASE_URL,
-      hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      hasResendKey: !!process.env.RESEND_API_KEY,
-      fromEmail: process.env.FROM_EMAIL || null,
-      alertEmail: process.env.BAR_ALERT_EMAIL || null,
-    };
-
-    // ---- Step B: Supabase insert
-    const { error: insertError } = await supabase.from('bar_signups').insert([{
-      bar_name: barName.trim(),
-      manager_name: managerName.trim(),
-      bar_phone: barPhone.trim(),
-      bar_email: barEmail.trim(),
-    }]);
+    // 1) Save to Supabase
+    const { error: insertError } = await supabase.from('bar_signups').insert([
+      {
+        bar_name: String(barName).trim(),
+        manager_name: String(managerName).trim(),
+        bar_phone: String(barPhone).trim(),
+        bar_email: String(barEmail).trim(),
+      },
+    ]);
 
     if (insertError) {
       return res.status(500).json({
         step: 'supabase_insert',
-        envCheck,
         error: insertError.message,
       });
     }
 
-    // ---- Step C: Emails
     const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
     const alertEmail = process.env.BAR_ALERT_EMAIL || 'dollarbarclub@gmail.com';
 
-    // C1 confirmation to bar
-    const confirmResult = await resend.emails.send({
+    // 2) Confirmation to bar
+    const confirm = await resend.emails.send({
       from: fromEmail,
-      to: barEmail.trim(),
+      to: String(barEmail).trim(),
       subject: 'Dollar Bar Club — Submission Received',
-      html: `<p>Thanks! We got your submission for <strong>${barName.trim()}</strong>.</p>`,
+      html: `<p>Thanks — we got your submission for <strong>${String(barName).trim()}</strong>. We’ll follow up shortly.</p>`,
     });
 
-    if (confirmResult?.error) {
-      return res.status(500).json({
-        step: 'resend_confirm',
-        envCheck,
-        error: confirmResult.error,
-      });
+    if (confirm?.error) {
+      return res.status(500).json({ step: 'resend_confirm', error: confirm.error });
     }
 
-    // C2 alert to you
-    const alertResult = await resend.emails.send({
+    // 3) Alert to you
+    const alert = await resend.emails.send({
       from: fromEmail,
       to: alertEmail,
       subject: 'New Bar Signup — Dollar Bar Club',
       html: `
-        <p><strong>Bar:</strong> ${barName.trim()}</p>
-        <p><strong>Manager:</strong> ${managerName.trim()}</p>
-        <p><strong>Phone:</strong> ${barPhone.trim()}</p>
-        <p><strong>Email:</strong> ${barEmail.trim()}</p>
+        <p><strong>Bar:</strong> ${String(barName).trim()}</p>
+        <p><strong>Manager:</strong> ${String(managerName).trim()}</p>
+        <p><strong>Phone:</strong> ${String(barPhone).trim()}</p>
+        <p><strong>Email:</strong> ${String(barEmail).trim()}</p>
       `,
     });
 
-    if (alertResult?.error) {
-      return res.status(500).json({
-        step: 'resend_alert',
-        envCheck,
-        error: alertResult.error,
-      });
+    if (alert?.error) {
+      return res.status(500).json({ step: 'resend_alert', error: alert.error });
     }
 
-    return res.status(200).json({ ok: true, envCheck });
+    return res.status(200).json({ ok: true });
   } catch (err) {
     return res.status(500).json({
       step: 'catch',
-      error: err?.message || String(err),
+      error: err && err.message ? err.message : String(err),
     });
   }
-}
+};

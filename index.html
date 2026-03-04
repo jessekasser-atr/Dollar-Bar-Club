@@ -386,7 +386,7 @@
     <input id="managerName" type="text" placeholder="Manager Name" required />
     <input id="barPhone" type="text" placeholder="Contact Phone Number" required />
     <input id="barEmail" type="email" placeholder="Email" required />
-    <button type="submit" class="primary-btn">Submit Bar Info</button>
+    <button id="barSubmitBtn" type="submit" class="primary-btn">Submit Bar Info</button>
   </form>
 
   <p id="barFormMessage" style="margin-top:12px;"></p>
@@ -410,6 +410,63 @@
     const form = document.getElementById('membershipForm');
     const msg = document.getElementById('formMessage');
 const waitlistCountEl = document.getElementById('waitlistCount');
+    const barForm = document.getElementById('barSignupForm');
+const barMsg = document.getElementById('barFormMessage');
+const barBtn = document.getElementById('barSubmitBtn');
+if (barForm) {
+  barForm.addEventListener('submit', async (e) => {
+    e.preventDefault(); // stops jump to top
+
+    // clear message
+    if (barMsg) {
+      barMsg.textContent = '';
+      barMsg.style.color = '';
+    }
+
+    // loading state
+    const originalText = barBtn ? barBtn.textContent : '';
+    if (barBtn) {
+      barBtn.disabled = true;
+      barBtn.textContent = 'Submitting...';
+    }
+
+    try {
+      const payload = {
+        barName: document.getElementById('barName')?.value?.trim(),
+        managerName: document.getElementById('managerName')?.value?.trim(),
+        barPhone: document.getElementById('barPhone')?.value?.trim(),
+        barEmail: document.getElementById('barEmail')?.value?.trim(),
+      };
+
+      const res = await fetch('/api/bar-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+
+      // success message
+      if (barMsg) {
+        barMsg.textContent = '✅ You’re on the list!';
+        barMsg.style.color = '#39d98a';
+      }
+
+      barForm.reset();
+    } catch (err) {
+      if (barMsg) {
+        barMsg.textContent = err.message || 'Error submitting bar form.';
+        barMsg.style.color = '#ff6b6b';
+      }
+    } finally {
+      if (barBtn) {
+        barBtn.disabled = false;
+        barBtn.textContent = originalText;
+      }
+    }
+  });
+}
 
 async function refreshWaitlistCount() {
   if (!waitlistCountEl) return;

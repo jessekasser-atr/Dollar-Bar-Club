@@ -254,9 +254,34 @@
           flex-direction: column;
         }
       }
+      .powered-by {
+  width: 100%;
+  text-align: center;
+  padding: 8px 0;
+  background: rgba(0, 255, 140, 0.08);
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+
+.powered-by a {
+  text-decoration: none;
+  font-weight: 600;
+  color: #8affc1;
+  transition: opacity 0.2s ease;
+}
+
+.powered-by a:hover {
+  opacity: 0.7;
+}
     </style>
   </head>
   <body>
+    <div class="powered-by">
+    <a href="https://www.barglance.com/" target="_blank" rel="noopener noreferrer">
+      &#9889; Powered by BarGlance
+    </a>
+  </div>
+
     <nav class="nav">
       <div class="nav-inner">
         <div class="logo">Dollar Bar Club</div>

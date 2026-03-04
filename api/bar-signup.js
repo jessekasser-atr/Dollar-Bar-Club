@@ -55,18 +55,31 @@ module.exports = async (req, res) => {
       return res.status(500).json({ step: 'resend_confirm', error: confirm.error });
     }
 
-    // 3) Alert to you
-    const alert = await resend.emails.send({
-      from: fromEmail,
-      to: alertEmail,
-      subject: 'New Bar Signup — Dollar Bar Club',
-      html: `
-        <p><strong>Bar:</strong> ${String(barName).trim()}</p>
-        <p><strong>Manager:</strong> ${String(managerName).trim()}</p>
-        <p><strong>Phone:</strong> ${String(barPhone).trim()}</p>
-        <p><strong>Email:</strong> ${String(barEmail).trim()}</p>
-      `,
-    });
+// 3) Alert to Dollar Bar Club
+const alert = await resend.emails.send({
+  from: fromEmail,
+  to: alertEmail,
+  subject: `🚨 New Bar Signup: ${String(barName).trim()}`,
+  html: `
+    <div style="font-family: Arial, sans-serif; line-height:1.6;">
+      <h2 style="color:#16a34a;">New Bar Signup Submitted</h2>
+
+      <p><strong>Bar Name:</strong><br>${String(barName).trim()}</p>
+
+      <p><strong>Manager Name:</strong><br>${String(managerName).trim()}</p>
+
+      <p><strong>Contact Phone:</strong><br>${String(barPhone).trim()}</p>
+
+      <p><strong>Email:</strong><br>${String(barEmail).trim()}</p>
+
+      <hr style="margin:20px 0;" />
+
+      <p style="font-size:12px;color:#555;">
+        Submitted at: ${new Date().toLocaleString()}
+      </p>
+    </div>
+  `,
+});
 
     if (alert?.error) {
       return res.status(500).json({ step: 'resend_alert', error: alert.error });

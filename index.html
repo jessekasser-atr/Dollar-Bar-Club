@@ -364,15 +364,16 @@
         <p class="section-lead" style="opacity:.85; margin-top:6px;">
   Live waitlist: <span id="waitlistCount">...</span>
 </p>
-  <form id="membershipForm" class="form-box">
+<form id="membershipForm" class="form-box">
   <input id="fullName" type="text" placeholder="Name" aria-label="Name" />
   <input id="email" type="email" placeholder="Email" aria-label="Email" />
+  <input id="phone" type="tel" placeholder="Phone (for early access alerts)" aria-label="Phone" />
   <input id="zip" type="text" placeholder="Austin Zip Code" aria-label="Austin zip code" />
   <button class="primary-btn" type="submit">Get My Free Membership</button>
-
-  <p id="formMessage" style="margin-top:12px;"></p>
 </form>
-      </section>
+
+<p id="formMessage" style="margin-top:12px;"></p>
+
 </section>
 
 <!-- PASTE BAR SECTION HERE -->
@@ -393,16 +394,14 @@
 </section>
 
 <footer>
-      <footer>
-        Austin, Texas • Invite-only locals program • Contact: <a href="mailto:dollarbarclub@gmail.com">dollarbarclub@gmail.com</a>
-        <p class="disclaimer">
-  Dollar Bar Club is a membership platform connecting users with participating venues.
-  All alcohol pricing, promotions, and availability are determined solely by the licensed retailer
-  in compliance with Texas law. Dollar Bar Club does not sell, distribute, or discount alcohol.
-</p>
-      </footer>
+  Austin, Texas • Invite-only locals program • Contact: <a href="mailto:dollarbarclub@gmail.com">dollarbarclub@gmail.com</a>
+  <p class="disclaimer">
+    Dollar Bar Club is a membership platform connecting users with participating venues.
+    All alcohol pricing, promotions, and availability are determined solely by the licensed retailer
+    in compliance with Texas law. Dollar Bar Club does not sell, distribute, or discount alcohol.
+  </p>
+</footer>
     </main>
-</main>
 
 <script>
   // Wait until the page HTML is loaded
@@ -484,9 +483,10 @@ async function refreshWaitlistCount() {
 refreshWaitlistCount();
     if (!form) return;
 
-    const fullNameEl = document.getElementById('fullName');
-    const emailEl = document.getElementById('email');
-    const zipEl = document.getElementById('zip');
+const fullNameEl = document.getElementById('fullName');
+const emailEl = document.getElementById('email');
+const phoneEl = document.getElementById('phone');
+const zipEl = document.getElementById('zip');
 
     function setMessage(text, isError = false) {
       if (!msg) return;
@@ -509,9 +509,10 @@ refreshWaitlistCount();
       e.preventDefault(); // prevents the page from jumping to the top
       setMessage('Submitting...');
 
-      const fullName = (fullNameEl?.value || '').trim();
-      const email = (emailEl?.value || '').trim();
-      const zip = (zipEl?.value || '').trim();
+const fullName = (fullNameEl?.value || '').trim();
+const email = (emailEl?.value || '').trim();
+const phone = (phoneEl?.value || '').trim();
+const zip = (zipEl?.value || '').trim();
 
       if (!email || !zip) {
         setMessage('Please enter email + Austin zip code.', true);
@@ -524,13 +525,14 @@ refreshWaitlistCount();
         const res = await fetch('/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fullName,
-            email,
-            zip,
-            lat: coords ? coords.lat : null,
-            lon: coords ? coords.lon : null
-          })
+body: JSON.stringify({
+  fullName,
+  email,
+  phone,
+  zip,
+  lat: coords ? coords.lat : null,
+  lon: coords ? coords.lon : null
+})
         });
 
         const data = await res.json().catch(() => ({}));

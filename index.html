@@ -542,8 +542,9 @@ body: JSON.stringify({
           return;
         }
 
-        setMessage("✅ You're on the list!");
-        form.reset();
+setMessage("✅ You're on the list!");
+form.reset();
+refreshWaitlistCount();
       } catch (err) {
         setMessage('Network error. Please try again.', true);
       }

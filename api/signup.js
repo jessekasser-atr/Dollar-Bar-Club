@@ -1,4 +1,4 @@
-async function sendConfirmationEmail({ to, zip }) {
+async function sendConfirmationEmail({ to, zip, fullName }) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
   const FROM_EMAIL = process.env.FROM_EMAIL || "onboarding@resend.dev";
   const APP_DOWNLOAD_URL = process.env.APP_DOWNLOAD_URL || "https://barglance.com";
@@ -10,7 +10,7 @@ async function sendConfirmationEmail({ to, zip }) {
   const html = `
     <div style="font-family:Arial,sans-serif;line-height:1.4">
       <h2>You're on the list ✅</h2>
-      <p>We got your signup${zip ? ` (ZIP ${zip})` : ""}.</p>
+<p>We got your signup${fullName ? `, ${fullName}` : ""}${zip ? ` (ZIP ${zip})` : ""}.</p>
       <p>When your digital passport is ready, you’ll get an invite link here.</p>
       <p style="margin-top:18px">
         <a href="${APP_DOWNLOAD_URL}" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#22c55e;color:#000;text-decoration:none;font-weight:700">
@@ -37,6 +37,37 @@ async function sendConfirmationEmail({ to, zip }) {
     }),
   });
 }
+async function sendAdminNotificationEmail({ email, fullName, phone, zip }) {
+  const RESEND_API_KEY = process.env.RESEND_API_KEY;
+  const FROM_EMAIL = process.env.FROM_EMAIL || "onboarding@resend.dev";
+
+  if (!RESEND_API_KEY) return;
+
+  const subject = "New Dollar Bar Club signup";
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.4">
+      <h2>New Dollar Bar Club signup</h2>
+      <p><strong>Name:</strong> ${fullName || "Not provided"}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Phone:</strong> ${phone || "Not provided"}</p>
+      <p><strong>ZIP:</strong> ${zip || "Not provided"}</p>
+    </div>
+  `;
+
+  await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: FROM_EMAIL,
+      to: "dollarbarclub@gmail.com",
+      subject,
+      html,
+    }),
+  });
+}
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -52,12 +83,14 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const body = req.body || {};
-    const email = String(body.email || "").trim().toLowerCase();
-    const zip = String(body.zip || "").trim();
-    const locationDenied = Boolean(body.locationDenied);
-    const lat = typeof body.lat === "number" ? body.lat : null;
-    const lng = typeof body.lng === "number" ? body.lng : null;
+const body = req.body || {};
+const fullName = String(body.fullName || "").trim();
+const email = String(body.email || "").trim().toLowerCase();
+const phone = String(body.phone || "").trim();
+const zip = String(body.zip || "").trim();
+const locationDenied = Boolean(body.locationDenied);
+const lat = typeof body.lat === "number" ? body.lat : null;
+const lng = typeof body.lon === "number" ? body.lon : null;
 
     if (!email || !email.includes("@")) {
       return res.status(400).json({ error: "Valid email required" });
@@ -67,14 +100,16 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: "ZIP required" });
     }
 
-    const payload = {
-      email,
-      zip,
-      lat,
-      lng,
-      location_denied: locationDenied,
-      created_at: new Date().toISOString(),
-    };
+const payload = {
+  full_name: fullName,
+  email,
+  phone,
+  zip,
+  lat,
+  lng,
+  location_denied: locationDenied,
+  created_at: new Date().toISOString(),
+};
 
     const response = await fetch(`${SUPABASE_URL}/rest/v1/signups`, {
       method: "POST",
@@ -95,7 +130,8 @@ module.exports = async function handler(req, res) {
         details: text,
       });
     }
-sendConfirmationEmail({ to: email, zip }).catch(() => {});
+sendConfirmationEmail({ to: email, zip, fullName }).catch(() => {});
+sendAdminNotificationEmail({ email, fullName, phone, zip }).catch(() => {});
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error(err);

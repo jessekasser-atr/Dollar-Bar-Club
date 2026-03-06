@@ -5,14 +5,16 @@ async function sendConfirmationEmail({ to, zip, fullName }) {
 
   if (!RESEND_API_KEY) return;
 
+  const firstName = fullName ? fullName.split(" ")[0] : "";
   const subject = "You're on the Dollar Bar Club waitlist 🍻";
 
   const html = `
     <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111">
-      <h2 style="margin-bottom:12px;">You're on the list ✅</h2>
-      <p>Hey${fullName ? ` ${fullName}` : ""},</p>
-      <p>Thanks for joining the Dollar Bar Club waitlist${zip ? ` from ZIP ${zip}` : ""}.</p>
-      <p>We’ll send you an invite as soon as your digital passport is ready.</p>
+      <h2 style="margin-bottom:12px;">You're officially on the list 🍻</h2>
+      <p>Hey${firstName ? ` ${firstName}` : ""},</p>
+      <p>You're officially on the list.</p>
+      <p>When Austin launches, you'll receive your digital membership for exclusive club access.</p>
+      <p>Tell your friends because spots will go fast!</p>
       <p style="margin-top:18px">
         <a href="${APP_DOWNLOAD_URL}" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#22c55e;color:#000;text-decoration:none;font-weight:700">
           Open Dollar Bar Club

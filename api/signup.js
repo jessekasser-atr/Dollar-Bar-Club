@@ -1,4 +1,4 @@
-async function sendConfirmationEmail({ to, zip, fullName }) {
+async function sendConfirmationEmail({ to, fullName }) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
   const FROM_EMAIL = process.env.FROM_EMAIL || "onboarding@resend.dev";
   const APP_DOWNLOAD_URL = process.env.APP_DOWNLOAD_URL || "https://barglance.com";
@@ -26,6 +26,8 @@ async function sendConfirmationEmail({ to, zip, fullName }) {
     </div>
   `;
 
+  console.log("Sending confirmation email to:", to);
+
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -44,6 +46,8 @@ async function sendConfirmationEmail({ to, zip, fullName }) {
     const errorText = await response.text();
     throw new Error(`Confirmation email failed: ${errorText}`);
   }
+
+  console.log("Confirmation email sent successfully to:", to);
 }
 
 async function sendAdminNotificationEmail({ email, fullName, phone, zip }) {
@@ -63,6 +67,8 @@ async function sendAdminNotificationEmail({ email, fullName, phone, zip }) {
     </div>
   `;
 
+  console.log("Sending admin notification email");
+
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -81,6 +87,8 @@ async function sendAdminNotificationEmail({ email, fullName, phone, zip }) {
     const errorText = await response.text();
     throw new Error(`Admin email failed: ${errorText}`);
   }
+
+  console.log("Admin notification email sent successfully");
 }
 
 module.exports = async function handler(req, res) {
@@ -146,13 +154,8 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    sendConfirmationEmail({ to: email, zip, fullName }).catch((err) =>
-      console.error("Confirmation email error:", err)
-    );
-
-    sendAdminNotificationEmail({ email, fullName, phone, zip }).catch((err) =>
-      console.error("Admin notification error:", err)
-    );
+    await sendConfirmationEmail({ to: email, fullName });
+    await sendAdminNotificationEmail({ email, fullName, phone, zip });
 
     return res.status(200).json({ ok: true });
   } catch (err) {

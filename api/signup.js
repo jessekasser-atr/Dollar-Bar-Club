@@ -119,10 +119,6 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: "Valid email required" });
     }
 
-    if (!zip) {
-      return res.status(400).json({ error: "ZIP required" });
-    }
-
     const payload = {
       full_name: fullName,
       email,

@@ -52,7 +52,7 @@ function mapBarToVenueRecord(bar) {
     instagram: null,
     lat: typeof bar.latitude === "number" ? bar.latitude : null,
     lng: typeof bar.longitude === "number" ? bar.longitude : null,
-    openNow: typeof bar.open_now === "boolean" ? bar.open_now : null,
+    openNow: typeof bar.open_now === "boolean" ? (bar.open_now ? 1 : 0) : null,
     priceLevel: Number.isInteger(bar.price_level) ? bar.price_level : null,
     hoursSummary: buildHoursSummary(bar.hours),
     rating: bar.rating?.public_rating ?? null,

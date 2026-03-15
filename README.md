@@ -1,8 +1,18 @@
 # Dollar Bar Club Pilot (Austin)
 
-This repository contains a lightweight pilot framework for Dollar Bar Club (DBC), operated by BarGlance.
+This repository contains the full pilot framework for Dollar Bar Club (DBC), operated by BarGlance.
 
-Current state: the core pilot loop is working end to end. The API is backed by SQLite, the member app supports branded onboarding -> browse -> venue detail -> geolocated redeem with launch-ready member states and a working PWA shell, BarGlance venue sync is wired with richer venue metadata, and the internal BarGlance console supports venue curation, offer management, redemption reporting, and curated venue profile overrides behind an internal access gate. Deployment prep is now aligned around Vercel for the website/member app and Railway for the API.
+Current state: the pilot is deployed and live. The marketing site, member app, admin console, and API are all accessible at `dollarbarclub.com`. The API runs on Render backed by SQLite, the member app supports branded onboarding, venue browse/detail, geolocation redemption, and a PWA shell. The internal BarGlance admin console supports venue curation, offer management, redemption reporting, and curated venue profile overrides behind an access key gate.
+
+## Live URLs
+
+| Surface | URL | Hosting |
+|---|---|---|
+| Marketing site | `dollarbarclub.com` | Vercel |
+| Member app | `dollarbarclub.com/app` | Vercel |
+| Admin console | `dollarbarclub.com/admin` | Vercel (access key protected) |
+| API | `dollarbarclub.com/api/*` | Vercel proxy → Render |
+| API (direct) | `dbc-api.onrender.com` | Render |
 
 ## Goals
 - On-site drink redemption with single-use validation
@@ -11,16 +21,39 @@ Current state: the core pilot loop is working end to end. The API is backed by S
 - Clear audit trail of redemptions
 
 ## Project Structure
-- `apps/api`: Node API for offers, members, venues, and redemption processing
-- `apps/member`: Mobile-first member-facing SPA (branded onboarding, venue browse/detail, geolocation redemption, PWA shell)
-- `apps/web`: Internal BarGlance operations console for venue sync/curation, offer management, and redemption reporting
+- `apps/api`: Express API for offers, members, venues, and redemption processing
+- `apps/member`: Mobile-first member-facing SPA source (branded onboarding, venue browse/detail, geolocation redemption, PWA shell)
+- `apps/web`: Internal BarGlance operations console source (venue sync/curation, offer management, redemption reporting)
+- `website/`: Vercel deployment root containing the marketing site and deployed copies of the member app and admin console
+  - `website/index.html`: marketing site landing page
+  - `website/app/`: deployed member app (copied from `apps/member/public`, paths adjusted for `/app` mount)
+  - `website/admin/`: deployed admin console (copied from `apps/web/public`, paths adjusted for `/admin` mount)
+  - `website/api/`: Vercel serverless functions for waitlist signup, bar signup, and stats (backed by Supabase)
+  - `website/vercel.json`: routing — SPA fallbacks for `/app` and `/admin`, API proxy to Render
 - `data/schema.sql`: SQLite schema reference snapshot
-- `data/dbc.sqlite`: local pilot database created on API startup
+- `data/dbc.sqlite`: local pilot database (created on API startup, gitignored)
 - `apps/api/src/migrations.js`: runtime DB migrations applied automatically on boot
 - `apps/api/src/catalog.js`: seed catalog boundary for local pilot defaults
 - `apps/api/src/barglance.js`: BarGlance client and payload mapping
 - `docs/architecture.md`: system architecture and rollout guidance
-- `docs/deployment.md`: recommended Vercel + Railway deployment layout
+- `docs/deployment.md`: deployment layout reference
+- `railway.json`, `Procfile`: Render/Railway deployment config
+
+## Hosting Architecture
+
+### Vercel
+Deploys from the `website/` directory of this repo. Serves:
+- `/` → marketing site (`website/index.html`)
+- `/app/*` → member app SPA (`website/app/`)
+- `/admin/*` → admin console SPA (`website/admin/`)
+- `/api/signup`, `/api/stats`, `/api/bar-signup` → Vercel serverless functions (Supabase-backed waitlist)
+- `/api/*` (all other paths) → proxied to Render via rewrite
+
+### Render
+Deploys from the repo root. Runs the Express API (`npm start`) with SQLite at `data/dbc.sqlite`. The database is auto-created with seed data on first boot. Runtime migrations run automatically on startup.
+
+### GitHub
+Single monorepo at `github.com/jessekasser-atr/Dollar-Bar-Club`. Both Vercel and Render deploy from the same repo.
 
 ## Pilot Redemption Flow
 1. Member opens the member app and selects an eligible live offer.
@@ -51,7 +84,13 @@ Current state: the core pilot loop is working end to end. The API is backed by S
   - Duplicate submissions return a stable approved response with the original `redeemedAt`
 - `GET /admin/venues`
   - Requires `X-Admin-Key`
+- `POST /admin/venues` (create manual venue)
+  - Requires `X-Admin-Key`
 - `POST /admin/venues/:id/enabled`
+  - Requires `X-Admin-Key`
+- `POST /admin/venues/:id/profile`
+  - Requires `X-Admin-Key`
+- `POST /admin/venues/:id/profile/reset`
   - Requires `X-Admin-Key`
 - `POST /admin/sync/barglance`
   - Requires `X-Admin-Key`
@@ -60,76 +99,68 @@ Current state: the core pilot loop is working end to end. The API is backed by S
 - `GET /venues`
   - Returns enabled pilot venues only
 
-## Quick Start
+## Quick Start (Local Development)
 1. Install dependencies:
    - `npm install`
 2. Set environment variables:
-   - Copy `.env.example` into your preferred local env setup
-   - Required for internal ops access: `ADMIN_ACCESS_KEY`
-   - Required for BarGlance sync: `BARGLANCE_API_KEY`
-   - Optional for browser/API origin control: `ALLOWED_ORIGINS`
+   - Copy `.env.example` to `.env` and fill in values
+   - Required: `ADMIN_ACCESS_KEY`
+   - Optional: `BARGLANCE_API_KEY` (for venue sync)
+   - Optional: `ALLOWED_ORIGINS` (defaults to `http://localhost:5173,http://localhost:5174`)
 3. Run API:
    - `npm run dev:api` (port 8787)
-   - This auto-creates `data/dbc.sqlite` and applies runtime migrations
+   - Auto-creates `data/dbc.sqlite` and applies runtime migrations
 4. Run member app:
    - `npm run dev:member` (port 5174)
-5. Run internal ops console:
+5. Run admin console:
    - `npm run dev:web` (port 5173)
 
-## Deployment Direction
-- Marketing site: `dollarbarclub.com/`
-- Member app: `dollarbarclub.com/app`
-- API: same-origin `/api/*` proxied to Railway
-- Internal ops console: protected internal surface, not part of the public member flow
+## Environment Variables
 
-## Current Config
-- Database: local SQLite at `data/dbc.sqlite`
-- BarGlance API key: read from `BARGLANCE_API_KEY`
-- Internal ops access key: read from `ADMIN_ACCESS_KEY`
-- Allowed browser origins: read from `ALLOWED_ORIGINS` as a comma-separated list
-  - Defaults locally to `http://localhost:5173,http://localhost:5174`
-- Example env template: `.env.example`
-- BarGlance import path: `POST /admin/sync/barglance`
-- Member-visible venues: enabled venues only
+### Render (API)
+| Variable | Required | Description |
+|---|---|---|
+| `PORT` | Yes | API listen port (`8787`) |
+| `ADMIN_ACCESS_KEY` | Yes | Shared secret for admin console and protected API routes |
+| `ALLOWED_ORIGINS` | Yes | Comma-separated list of allowed CORS origins |
+| `BARGLANCE_API_KEY` | Optional | BarGlance partner API key for venue sync |
+
+### Vercel (Website)
+Managed via Vercel project settings. The serverless functions in `website/api/` use:
+| Variable | Required | Description |
+|---|---|---|
+| `SUPABASE_URL` | Yes | Supabase project URL for waitlist signups |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key |
+| `RESEND_API_KEY` | Optional | Resend key for confirmation/notification emails |
+| `FROM_EMAIL` | Optional | Sender email for transactional emails |
+
+## Production Config
+- Database: SQLite at `data/dbc.sqlite` on Render (ephemeral on free tier, persistent on paid with disk)
+- API CORS: allowlisted via `ALLOWED_ORIGINS` (production: `https://dollarbarclub.com`)
+- Admin auth: shared `ADMIN_ACCESS_KEY` gate — the admin console prompts for it before loading, API routes validate via `X-Admin-Key` header
+- Member app API base: resolves to `/api` in production (same-origin, proxied to Render by Vercel)
+- Admin console API base: resolves to `/api` in production (same-origin, proxied to Render by Vercel)
+- Rate limiting: in-memory, resets on API restart
+  - `POST /memberships/claim`: 5 requests per IP per 15 minutes
+  - `POST /redeem`: 12 requests per IP per 5 minutes
+- Render free tier: API spins down after ~15 min of inactivity, first request takes ~30s to wake
 - Venue profile source of truth:
   - BarGlance sync provides the base venue data layer
   - Local curated profile fields override the base layer for member-facing display
   - Manual venues are stored locally and behave as fully curated records
-- Synced BarGlance venues: imported disabled by default until explicitly enabled for pilot use
-- BarGlance venue enrichment stored locally: `open_now`, `price_level`, `hours_summary`, ratings, review counts, and raw payload JSON
-- Local seed venues remain available for fallback/demo coverage
-- Member app API base:
-  - Local dev defaults to `http://localhost:8787`
-  - Production defaults to same-origin `/api`
-  - An injected `window.__DBC_API_BASE__` can override the default
-- Member app shell:
-  - `manifest.json` + `service-worker.js` are wired for installability/offline shell behavior
-  - App icon path is `apps/member/public/icons/icon.svg`
-- API CORS: allowlisted via `ALLOWED_ORIGINS`
-- Default API port: `8787`
-- Member app port: `5174`
-- Internal ops console port: `5173`
-- Current local dev URLs:
-  - Member app: `http://localhost:5174`
-  - Internal ops console: `http://localhost:5173`
-  - API health: `http://localhost:8787/health`
-- Admin auth behavior:
-  - The internal ops console prompts for the current access key before loading
-  - Protected API requests use the `X-Admin-Key` header
-  - Public member endpoints remain open
-- Current API abuse controls:
-  - `POST /memberships/claim`: 5 requests per IP per 15 minutes
-  - `POST /redeem`: 12 requests per IP per 5 minutes
+- Synced BarGlance venues: imported disabled by default until explicitly enabled
+- Seed venues (The Roosevelt Room, Whisler's) are auto-created on every fresh database boot
 
-## Current Local Test Venues
-- Seed/demo venues enabled: The Roosevelt Room, Whisler's
-- Real BarGlance venues enabled: Casino El Camino, Continental Club, Lazarus Brewing Co., Radio Coffee & Beer, Zanzibar
-- Active sample offers on imported venues:
-  - Casino El Camino: `BOGO Wings`
-  - Continental Club: `$1 Stage Door Highball`
-  - Lazarus Brewing Co.: `$1 House Lager`
-  - Radio Coffee & Beer: `$1 Draft Pour`
-  - Zanzibar: `$1 Rooftop Daiquiri`
+## Local Dev URLs
+- Member app: `http://localhost:5174`
+- Admin console: `http://localhost:5173`
+- API health: `http://localhost:8787/health`
+
+## Deploying Changes
+- **Push to `main`** → Vercel auto-deploys the website, member app, and admin console
+- **Push to `main`** → Render auto-deploys the API (if connected via GitHub; currently using public repo URL)
+- Member app changes in `apps/member/public/` must be copied to `website/app/` before pushing
+- Admin console changes in `apps/web/public/` must be copied to `website/admin/` before pushing
 
 ## Progress Snapshot
 - Implemented: SQLite-backed memberships, venues, offers, entitlements, and redemption logging
@@ -152,24 +183,19 @@ Current state: the core pilot loop is working end to end. The API is backed by S
 - Implemented: env-driven CORS allowlist instead of permissive `*`
 - Implemented: stable repo-root SQLite path so local/dev boot uses the expected shared database
 - Implemented: production frontend API defaults to same-origin `/api`
-- Implemented: deployment documentation for the Vercel + Railway split
 - Implemented: curated real Austin BarGlance venues and sample offers for member-app testing
-- Not implemented yet: Railway/Vercel deployment wiring, durable shared secret management, production-grade rate limiting/storage-backed throttling, final UI pass
+- Implemented: full production deployment — Vercel (marketing site, member app, admin console) + Render (API)
+- Implemented: Vercel `/api/*` proxy to Render with serverless function passthrough for Supabase endpoints
+- Not yet implemented: persistent disk on Render (requires paid tier), durable shared secret management, production-grade rate limiting, final UI pass
 
 ## Notes
 - This is intentionally minimal for pilot speed.
 - `data/schema.sql` is the reference schema snapshot; runtime migrations are the active bootstrap path.
-- The two original local pilot venues remain enabled by default.
-- BarGlance venues are now importable and stored locally, but they do not appear in the member app until enabled.
-- The local database currently includes real imported Austin bars plus seed/demo venues for pilot iteration.
-- The running local API can be started with `BARGLANCE_API_KEY` in the environment to make venue sync available.
-- The repo includes `.env.example` as the baseline deployment/local-config template.
-- The public deployment target is Vercel for frontend surfaces and Railway for the API; see `docs/deployment.md`.
-- The intended public entry point is the marketing site at `/`, with the member app mounted at `/app`.
-- The member app and internal ops console default to `/api` in production unless `window.__DBC_API_BASE__` is injected.
-- Venue data shown to members is now the merged effective profile: curated override values win, synced/base values fill any remaining gaps.
-- The internal ops console currently uses a shared `ADMIN_ACCESS_KEY` gate rather than a full user account system.
-- The current local API process may have a temporary `ADMIN_ACCESS_KEY` set for testing; use environment configuration rather than hardcoding a key in code.
-- The current rate limiters are in-memory and reset when the API process restarts.
-- Move rate limiting and shared secret handling to a more durable production setup before scaling.
-- Member app styling is now aligned with the `website/` brand direction.
+- The two seed pilot venues are auto-created on every fresh database boot.
+- BarGlance venues are importable via the admin console sync tab, but do not appear in the member app until enabled.
+- The repo includes `.env.example` as the baseline local config template.
+- Venue data shown to members uses the merged effective profile: curated override values win, synced/base values fill gaps.
+- The admin console uses a shared `ADMIN_ACCESS_KEY` gate rather than a full user account system.
+- Rate limiters are in-memory and reset when the API process restarts.
+- On Render free tier, the SQLite database resets on each deploy/restart. Seed data is recreated automatically. Upgrade to a paid tier with persistent disk for durable storage.
+- Member app styling is aligned with the `website/` brand direction.

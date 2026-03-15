@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dollar Bar Club - Pilot Console</title>
+    <style>
+      :root {
+        --bg: #f5f6f8;
+        --panel: #ffffff;
+        --line: #b0b8c4;
+        --text: #161b22;
+        --muted: #5c6675;
+        --accent: #0a66ff;
+        --accent-soft: #eaf2ff;
+        --danger: #c62828;
+        --ok: #107c41;
+      }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 24px auto;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 24px 28px;
+        box-shadow: 0 5px 18px rgba(15, 20, 30, 0.06);
+      }
+      .app-header { margin-bottom: 6px; }
+      .app-header h1 { margin: 0 0 4px; }
+      .app-header p { color: var(--muted); margin: 0; }
+
+      /* Tab navigation */
+      .tab-nav {
+        display: flex;
+        gap: 0;
+        border-bottom: 2px solid var(--line);
+        margin: 18px 0 24px;
+      }
+      .tab-btn {
+        padding: 10px 22px;
+        margin: 0 0 -2px 0;
+        border: none;
+        border-bottom: 2px solid transparent;
+        background: none;
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
+      }
+      .tab-btn:hover { color: var(--text); }
+      .tab-btn.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+      .tab-content { display: none; }
+      .tab-content.active { display: block; }
+
+      /* Shared form elements */
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .stack { margin-top: 14px; }
+      label {
+        display: block;
+        margin: 0 0 6px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--text);
+      }
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--text);
+        min-height: 80px;
+        resize: vertical;
+        font-family: inherit;
+      }
+      select {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--text);
+      }
+      button {
+        padding: 9px 14px;
+        border: 1px solid var(--accent);
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        background: var(--accent);
+        color: #fff;
+      }
+      button:disabled {
+        cursor: wait;
+        opacity: 0.7;
+      }
+      button.secondary {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      button.danger-outline {
+        background: #fff;
+        color: var(--danger);
+        border-color: var(--danger);
+      }
+
+      /* Toolbar row */
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+
+      /* Two-column venue layout */
+      .venue-columns {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+        margin-top: 20px;
+      }
+      .venue-list-col {
+        max-height: 620px;
+        overflow-y: auto;
+        padding-right: 6px;
+      }
+      .venue-list-col::-webkit-scrollbar { width: 5px; }
+      .venue-list-col::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
+      /* Sub-section panels */
+      .sub-section {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 24px;
+      }
+      .sub-section h3 {
+        margin: 0 0 12px;
+        font-size: 15px;
+      }
+      .sub-section .grid { margin-bottom: 10px; }
+
+      /* Cards in lists */
+      .offers { display: grid; gap: 14px; }
+      .offer {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: #fff;
+      }
+      .offer h3 { margin: 0 0 4px; font-size: 15px; }
+      .offer p { margin: 0; font-size: 13px; }
+      .card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .card-actions button { font-size: 12px; padding: 6px 10px; }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 6px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      .pill-ok { background: #e8f6ee; color: var(--ok); }
+      .pill-muted { background: #eef2f7; color: var(--muted); }
+      .pill-accent { background: var(--accent-soft); color: var(--accent); }
+
+      /* Section header inside a tab */
+      .section-header {
+        margin: 0 0 20px;
+      }
+      .section-header h2 {
+        margin: 0 0 6px;
+        font-size: 18px;
+      }
+      .section-header p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      /* Access gate */
+      .gate {
+        max-width: 520px;
+        margin: 60px auto;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 5px 18px rgba(15, 20, 30, 0.06);
+      }
+      .gate h2 { margin: 0 0 8px; font-size: 24px; }
+      .gate p { margin: 0 0 16px; }
+      .gate-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+      .gate-error { margin-top: 12px; color: var(--danger); font-size: 13px; }
+
+      .result {
+        margin-top: 20px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #fff;
+        border: 1px solid var(--line);
+        white-space: pre-wrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      .ok { border-color: #9fd8b9; color: var(--ok); }
+      .bad { border-color: #f0b6b6; color: var(--danger); }
+
+      .flash { animation: flash-select 1.2s ease; }
+      @keyframes flash-select {
+        0% { box-shadow: 0 0 0 0 rgba(10, 102, 255, 0.35); }
+        100% { box-shadow: 0 0 0 12px rgba(10, 102, 255, 0); }
+      }
+
+      @media (max-width: 900px) {
+        .wrap { margin: 12px; padding: 16px; }
+        .grid { grid-template-columns: 1fr; }
+        .venue-columns { grid-template-columns: 1fr; }
+        .venue-list-col { max-height: none; overflow-y: visible; padding-right: 0; }
+        .tab-btn { padding: 8px 14px; font-size: 13px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <template id="ops-template">
+      <main class="wrap">
+        <div class="app-header">
+          <h1>Dollar Bar Club</h1>
+          <p>Internal BarGlance ops console</p>
+        </div>
+
+        <nav class="tab-nav">
+          <button class="tab-btn active" data-tab="venues">Venues</button>
+          <button class="tab-btn" data-tab="offers">Offers</button>
+          <button class="tab-btn" data-tab="redemptions">Redemptions</button>
+          <button class="tab-btn" data-tab="sync">Sync</button>
+        </nav>
+
+        <!-- VENUES TAB -->
+        <div class="tab-content active" id="tab-venues">
+          <div class="section-header">
+            <h2>Pilot Venues</h2>
+            <p>Browse, enable/disable, curate profiles, and create manual venues.</p>
+          </div>
+          <div class="grid">
+            <div>
+              <label for="venueSearch">Search Venues</label>
+              <input id="venueSearch" placeholder="Search by name, address, or ID" />
+            </div>
+            <div>
+              <label for="venueFilter">Filter</label>
+              <select id="venueFilter">
+                <option value="all">All venues</option>
+                <option value="enabled">Enabled only</option>
+                <option value="disabled">Disabled only</option>
+                <option value="seed">Seed only</option>
+                <option value="barglance">BarGlance only</option>
+                <option value="manual">Manual only</option>
+              </select>
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button id="loadVenuesBtn" class="secondary">Refresh Venues</button>
+            <span id="venueAdminSummary" style="color:var(--muted);font-size:13px;"></span>
+          </div>
+
+          <div class="venue-columns">
+            <div class="venue-list-col">
+              <div id="venueAdminList" class="offers"></div>
+            </div>
+            <div class="venue-sidebar">
+              <div class="sub-section" id="venueProfilePanel">
+                <h3>Edit Venue Profile</h3>
+                <div id="venueProfileSummary" style="margin-bottom:10px;color:var(--muted);font-size:13px;">Select a venue from the list to edit its displayed profile.</div>
+                <div id="venueProfileStatus" style="margin-bottom:10px;color:var(--muted);font-size:13px;"></div>
+                <div class="grid">
+                  <div>
+                    <label for="profileVenueName">Display Name</label>
+                    <input id="profileVenueName" placeholder="Venue name shown in the app" />
+                  </div>
+                  <div>
+                    <label for="profileVenueImageUrl">Hero Image URL</label>
+                    <input id="profileVenueImageUrl" placeholder="https://..." />
+                  </div>
+                  <div>
+                    <label for="profileVenueAddress">Display Address</label>
+                    <input id="profileVenueAddress" placeholder="Venue address" />
+                  </div>
+                  <div>
+                    <label for="profileVenueNeighborhood">Neighborhood</label>
+                    <input id="profileVenueNeighborhood" placeholder="South Congress" />
+                  </div>
+                  <div>
+                    <label for="profileVenueType">Type</label>
+                    <input id="profileVenueType" placeholder="Cocktail Bar" />
+                  </div>
+                  <div>
+                    <label for="profileVenueWebsite">Website</label>
+                    <input id="profileVenueWebsite" placeholder="https://venue.com" />
+                  </div>
+                  <div>
+                    <label for="profileVenuePhone">Phone</label>
+                    <input id="profileVenuePhone" placeholder="(512) 555-0000" />
+                  </div>
+                </div>
+                <div style="margin-top:10px;">
+                  <label for="profileVenueDescription">Description</label>
+                  <textarea id="profileVenueDescription" placeholder="Short venue description shown in the member app"></textarea>
+                </div>
+                <div class="card-actions" style="margin-top:14px;">
+                  <button id="saveVenueProfileBtn">Save Profile</button>
+                  <button id="clearVenueProfileBtn" class="danger-outline" type="button">Clear Overrides</button>
+                </div>
+              </div>
+
+              <div class="sub-section">
+                <h3>Create Manual Venue</h3>
+                <div class="grid">
+                  <div>
+                    <label for="manualVenueName">Name</label>
+                    <input id="manualVenueName" placeholder="New partner bar" />
+                  </div>
+                  <div>
+                    <label for="manualVenueAddress">Address</label>
+                    <input id="manualVenueAddress" placeholder="123 Main St, Austin, TX" />
+                  </div>
+                  <div>
+                    <label for="manualVenueCity">City</label>
+                    <input id="manualVenueCity" value="Austin" />
+                  </div>
+                  <div>
+                    <label for="manualVenueState">State</label>
+                    <input id="manualVenueState" value="TX" />
+                  </div>
+                  <div>
+                    <label for="manualVenueType">Type</label>
+                    <input id="manualVenueType" placeholder="Cocktail Bar" />
+                  </div>
+                  <div>
+                    <label for="manualVenueNeighborhood">Neighborhood</label>
+                    <input id="manualVenueNeighborhood" placeholder="East 6th" />
+                  </div>
+                </div>
+                <div class="card-actions" style="margin-top:12px;">
+                  <button id="createVenueBtn">Create Venue</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OFFERS TAB -->
+        <div class="tab-content" id="tab-offers">
+          <div class="sub-section">
+            <div class="section-header">
+              <h2>Create Offer</h2>
+              <p>Create a live member offer for an enabled pilot venue.</p>
+            </div>
+            <div id="selectedVenueSummary" style="margin-bottom:10px;color:var(--muted);font-size:13px;">No venue selected yet. Choose one from the venue list or enter a venue ID manually.</div>
+            <div id="offerCreateStatus" style="margin-bottom:10px;color:var(--muted);font-size:13px;"></div>
+            <div class="grid">
+              <div>
+                <label for="newOfferId">Offer ID</label>
+                <input id="newOfferId" placeholder="offer-happy-hour-shot" />
+              </div>
+              <div>
+                <label for="newOfferVenueId">Venue ID</label>
+                <input id="newOfferVenueId" placeholder="austin-pilot-venue-1" />
+              </div>
+              <div>
+                <label for="newOfferTitle">Title</label>
+                <input id="newOfferTitle" placeholder="$1 Welcome Cocktail" />
+              </div>
+              <div>
+                <label for="newOfferImageUrl">Image URL (Optional)</label>
+                <input id="newOfferImageUrl" placeholder="https://..." />
+              </div>
+              <div>
+                <label for="newOfferStartsAt">Starts At</label>
+                <input id="newOfferStartsAt" type="datetime-local" />
+              </div>
+              <div>
+                <label for="newOfferEndsAt">Ends At</label>
+                <input id="newOfferEndsAt" type="datetime-local" />
+              </div>
+            </div>
+            <div style="margin-top:10px;">
+              <label for="newOfferDescription">Description (Optional)</label>
+              <input id="newOfferDescription" placeholder="Pilot one-time offer for active members." />
+            </div>
+            <div class="card-actions" style="margin-top:14px;">
+              <button id="createOfferBtn">Create Offer</button>
+            </div>
+          </div>
+
+          <div class="section-header" style="margin-top:36px;">
+            <h2>Manage Offers</h2>
+            <p>Review, search, and toggle offer status across the pilot catalog.</p>
+          </div>
+          <div class="grid">
+            <div>
+              <label for="offerSearch">Search Offers</label>
+              <input id="offerSearch" placeholder="Offer ID, title, venue" />
+            </div>
+            <div>
+              <label for="offerFilter">Filter</label>
+              <select id="offerFilter">
+                <option value="all">All offers</option>
+                <option value="active">Active only</option>
+                <option value="inactive">Inactive only</option>
+              </select>
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button id="loadAdminOffersBtn" class="secondary">Refresh Offers</button>
+            <span id="offerAdminSummary" style="color:var(--muted);font-size:13px;"></span>
+          </div>
+          <div id="offerAdminList" class="offers"></div>
+        </div>
+
+        <!-- REDEMPTIONS TAB -->
+        <div class="tab-content" id="tab-redemptions">
+          <div class="section-header">
+            <h2>Redemption Reporting</h2>
+            <p>Monitor approved, duplicate, and denied redemption activity across the pilot.</p>
+          </div>
+          <div class="grid">
+            <div>
+              <label for="redemptionSearch">Search Redemptions</label>
+              <input id="redemptionSearch" placeholder="Token, offer, venue, staff, device" />
+            </div>
+            <div>
+              <label for="redemptionFilter">Filter</label>
+              <select id="redemptionFilter">
+                <option value="all">All results</option>
+                <option value="approved">Approved only</option>
+                <option value="duplicate">Duplicate only</option>
+                <option value="denied">Denied only</option>
+              </select>
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button id="loadRedemptionsBtn" class="secondary">Refresh Redemptions</button>
+            <span id="redemptionSummary" style="color:var(--muted);font-size:13px;"></span>
+          </div>
+          <div id="redemptionList" class="offers"></div>
+        </div>
+
+        <!-- SYNC TAB -->
+        <div class="tab-content" id="tab-sync">
+          <div class="section-header">
+            <h2>Sync BarGlance Venues</h2>
+            <p>Pull the latest Austin venue set from BarGlance into the local pilot database.</p>
+          </div>
+          <div class="grid">
+            <div>
+              <label for="syncState">State</label>
+              <input id="syncState" value="TX" />
+            </div>
+            <div>
+              <label for="syncCity">City</label>
+              <input id="syncCity" value="Austin" />
+            </div>
+            <div>
+              <label for="syncPages">Pages</label>
+              <input id="syncPages" value="1" />
+            </div>
+            <div>
+              <label for="syncPerPage">Per Page</label>
+              <input id="syncPerPage" value="50" />
+            </div>
+          </div>
+          <div class="card-actions" style="margin-top:14px;">
+            <button id="syncBarglanceBtn">Sync Venues</button>
+          </div>
+          <div id="syncStatus" style="margin-top:12px;color:var(--muted);font-size:13px;"></div>
+        </div>
+
+        <div id="result" class="result" style="display:none;"></div>
+      </main>
+    </template>
+    <script src="/admin/app.js"></script>
+  </body>
+</html>

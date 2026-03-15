@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/app/:path*", "destination": "/app/index.html" },
+    { "source": "/admin/:path*", "destination": "/admin/index.html" },
     { "source": "/api/:path*", "destination": "https://dbc-api.onrender.com/:path*" }
   ]
 }

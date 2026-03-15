@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Get Drink Specials That Aren't On The Menu</title>
+    <meta
+      name="description"
+      content="Access member-only specials and venue-hosted perks at hand-selected Austin bars."
+    />
+    <style>
+      :root {
+        --bg: #0a0a0a;
+        --surface: #111111;
+        --card: #1a1a1a;
+        --text: #f5f5f5;
+        --muted: #a0a0a0;
+        --accent: #35d06f;
+        --accent-dark: #23a955;
+        --border: rgba(255, 255, 255, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        overflow-x: hidden;
+      }
+
+      html,
+      body {
+        margin: 0;
+        font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, #1a1a1a 0%, var(--bg) 48%);
+        color: var(--text);
+      }
+
+      body {
+        overflow-x: hidden;
+      }
+
+      img {
+        max-width: 100%;
+        display: block;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .wrap {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 0 20px 60px;
+      }
+
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.97);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      }
+
+      .nav-inner {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .logo {
+        font-size: 28px;
+        font-weight: 700;
+        color: #0a0a0a;
+      }
+
+      .nav-btn,
+      .primary-btn {
+        border: 0;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #041006;
+        font-weight: 700;
+        font-size: 14px;
+        padding: 12px 18px;
+        cursor: pointer;
+      }
+
+      .nav-btn:hover,
+      .primary-btn:hover {
+        background: var(--accent-dark);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 24px;
+        padding-top: 40px;
+        align-items: center;
+      }
+
+      .badge {
+        display: inline-flex;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 14px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        line-height: 1.05;
+        font-size: clamp(32px, 6vw, 56px);
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 18px;
+        max-width: 56ch;
+      }
+
+      .hero-cta {
+        margin-top: 24px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        position: relative;
+        z-index: 1;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .hero-photo {
+        border-radius: 24px;
+        border: 1px solid var(--border);
+        min-height: 360px;
+        pointer-events: none;
+        background: linear-gradient(160deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.15)),
+          url("hero.jpg") center/cover;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      }
+
+      .section {
+        margin-top: 0;
+        padding: 60px 0;
+      }
+
+      #claim {
+        scroll-margin-top: 88px;
+      }
+
+      .section-band {
+        padding: 60px calc(50vw - 50% + 20px);
+        margin-left: calc(-50vw + 50%);
+        margin-right: calc(-50vw + 50%);
+      }
+
+      .section-band--alt {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .section-band--elevated {
+        background: rgba(255, 255, 255, 0.06);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+
+      h2 {
+        margin: 0 0 10px;
+        font-size: clamp(26px, 3.6vw, 36px);
+      }
+
+      .section-lead {
+        color: var(--muted);
+        margin: 0;
+      }
+
+      .steps,
+      .benefits,
+      .partners {
+        margin-top: 28px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+      }
+
+      .partners {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        background: var(--card);
+        border-radius: 18px;
+        padding: 18px;
+      }
+
+      .icon {
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 8px;
+      }
+
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 17px;
+      }
+
+      .card p {
+        margin: 0;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .benefits .card {
+        border-left: 3px solid var(--accent);
+      }
+
+      .partners .card {
+        min-height: 128px;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(26, 26, 26, 0.8));
+      }
+
+      .form-box {
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        border-radius: 20px;
+        padding: 18px;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      input {
+        width: 100%;
+        min-width: 0;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: #0f0f0f;
+        color: var(--text);
+        padding: 12px;
+        font-size: 14px;
+      }
+
+      .form-box .primary-btn {
+        white-space: nowrap;
+      }
+
+      .quote {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      footer {
+        margin-top: 44px;
+        border-top: 1px solid var(--border);
+        padding-top: 20px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .steps,
+        .benefits,
+        .partners,
+        .form-box {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-photo {
+          min-height: 280px;
+        }
+
+        .nav-btn {
+          display: none;
+        }
+
+        .primary-btn {
+          width: 100%;
+        }
+
+        .nav-inner {
+          align-items: center;
+          flex-direction: column;
+        }
+
+        .logo {
+          text-align: center;
+        }
+
+        .powered-by {
+          font-size: 15px;
+        }
+      }
+
+      .powered-by {
+        width: 100%;
+        text-align: center;
+        padding: 14px 0;
+        background: rgba(255, 255, 255, 0.05);
+        font-size: 20px;
+        letter-spacing: 0.5px;
+        font-weight: 400;
+      }
+
+      .powered-by a {
+        text-decoration: none;
+        font-weight: inherit;
+        color: #cccccc;
+        transition: opacity 0.2s ease;
+      }
+
+      .powered-by a:hover {
+        opacity: 0.7;
+      }
+
+      .powered-by .brand {
+        font-weight: 400;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="powered-by">
+      <a href="https://www.barglance.com/" target="_blank" rel="noopener noreferrer">
+        Powered by <span class="brand">BarGlance</span>
+      </a>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-inner">
+        <div class="logo">Dollar Bar Club</div>
+        <button class="nav-btn" type="button" onclick="document.getElementById('claim').scrollIntoView({ behavior: 'smooth' })">
+          Join the Waitlist
+        </button>
+      </div>
+    </nav>
+
+    <main class="wrap">
+      <section class="hero">
+        <div>
+          <span class="badge">Invite-Only - Austin, TX</span>
+          <h1>Get Drink Specials That Aren't On The Menu</h1>
+          <p>
+            Access exclusive, venue-hosted specials and neighborhood perks at hand-selected Austin bars.
+          </p>
+          <div class="hero-cta">
+            <button class="primary-btn" type="button" onclick="document.getElementById('claim').scrollIntoView({ behavior: 'smooth' })">
+              Join the Waitlist
+            </button>
+            <span class="muted">Verified via Austin zip code - 100% free for locals</span>
+          </div>
+        </div>
+        <div class="hero-photo" role="img" aria-label="Signature cocktail from an Austin partner bar"></div>
+      </section>
+
+      <div class="section-band section-band--alt" style="margin-top: 80px;">
+        <section class="section">
+          <h2>How It Works</h2>
+          <p class="section-lead">From signup to your first reward in under a minute.</p>
+          <div class="steps">
+            <article class="card">
+              <div class="icon">Sign Up</div>
+              <h3>1. Sign Up</h3>
+              <p>Enter your email and Austin zip code to verify local status and receive your digital invite.</p>
+            </article>
+            <article class="card">
+              <div class="icon">Explore</div>
+              <h3>2. Explore</h3>
+              <p>Browse hand-selected spots, from hidden speakeasies to iconic rooftops, all in one membership.</p>
+            </article>
+            <article class="card">
+              <div class="icon">Redeem</div>
+              <h3>3. Redeem</h3>
+              <p>Present your digital membership at participating venues to access available member specials.</p>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <section class="section">
+        <h2>Why Join the Club?</h2>
+        <div class="benefits">
+          <article class="card">
+            <h3>Local Rewards</h3>
+            <p>Enjoy exclusive venue-hosted specials, limited-time pricing, and member-only experiences.</p>
+          </article>
+          <article class="card">
+            <h3>Zero Cost</h3>
+            <p>Membership is free for verified Austin residents during the invite rollout.</p>
+          </article>
+          <article class="card">
+            <h3>Curated Only</h3>
+            <p>No chains. No tourist traps. Just Austin bars worth your night out.</p>
+          </article>
+        </div>
+      </section>
+
+      <div class="section-band section-band--elevated">
+        <section class="section" id="claim">
+          <h2>Ready to get started?</h2>
+          <p class="section-lead">Join Austin locals already waiting for launch access.</p>
+          <p class="section-lead" style="opacity: 0.85; margin-top: 6px;">
+            Live waitlist: <span id="waitlistCount">...</span>
+          </p>
+          <form id="membershipForm" class="form-box">
+            <input id="fullName" type="text" placeholder="Name" aria-label="Name" />
+            <input id="email" type="email" placeholder="Email" aria-label="Email" />
+            <input id="phone" type="tel" placeholder="Phone (for early access alerts)" aria-label="Phone" />
+            <input id="zip" type="text" placeholder="Austin Zip Code" aria-label="Austin zip code" />
+            <button class="primary-btn" type="submit">Get My Free Membership</button>
+          </form>
+
+          <p id="formMessage" style="margin-top: 12px;"></p>
+        </section>
+      </div>
+
+      <section class="section" id="bar-signup">
+        <h2>Own a bar?</h2>
+        <p class="section-lead">Want Dollar Bar Club to drive customers to you? Drop your info.</p>
+
+        <form id="barSignupForm" class="form-box">
+          <input id="barName" type="text" placeholder="Bar Name" required />
+          <input id="managerName" type="text" placeholder="Manager Name" required />
+          <input id="barPhone" type="text" placeholder="Contact Phone Number" required />
+          <input id="barEmail" type="email" placeholder="Email" required />
+          <button id="barSubmitBtn" type="submit" class="primary-btn">Submit Bar Info</button>
+        </form>
+
+        <p id="barFormMessage" style="margin-top: 12px;"></p>
+      </section>
+
+      <footer>
+        Austin, Texas - Invite-only locals program - Contact:
+        <a href="mailto:dollarbarclub@gmail.com">dollarbarclub@gmail.com</a>
+        <p class="disclaimer">
+          Dollar Bar Club is a membership platform connecting users with participating venues. All alcohol pricing,
+          promotions, and availability are determined solely by the licensed retailer in compliance with Texas law.
+          Dollar Bar Club does not sell, distribute, or discount alcohol.
+        </p>
+      </footer>
+    </main>
+
+    <script>
+      window.addEventListener("DOMContentLoaded", () => {
+        const form = document.getElementById("membershipForm");
+        const msg = document.getElementById("formMessage");
+        const waitlistCountEl = document.getElementById("waitlistCount");
+        const barForm = document.getElementById("barSignupForm");
+        const barMsg = document.getElementById("barFormMessage");
+        const barBtn = document.getElementById("barSubmitBtn");
+
+        function setMessage(text, isError = false) {
+          if (!msg) return;
+          msg.textContent = text;
+          msg.style.color = isError ? "#ff4b4b" : "#35d06f";
+        }
+
+        async function refreshWaitlistCount() {
+          if (!waitlistCountEl) return;
+
+          try {
+            const response = await fetch("/api/stats");
+            const data = await response.json();
+
+            if (response.ok && typeof data.waitlistCount === "number") {
+              waitlistCountEl.textContent = data.waitlistCount.toLocaleString();
+            }
+          } catch (error) {
+            // Ignore count refresh failures on the marketing page.
+          }
+        }
+
+        if (barForm) {
+          barForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            if (barMsg) {
+              barMsg.textContent = "";
+              barMsg.style.color = "";
+            }
+
+            const originalText = barBtn ? barBtn.textContent : "";
+            if (barBtn) {
+              barBtn.disabled = true;
+              barBtn.textContent = "Submitting...";
+            }
+
+            try {
+              const payload = {
+                barName: document.getElementById("barName")?.value?.trim(),
+                managerName: document.getElementById("managerName")?.value?.trim(),
+                barPhone: document.getElementById("barPhone")?.value?.trim(),
+                barEmail: document.getElementById("barEmail")?.value?.trim(),
+              };
+
+              const response = await fetch("/api/bar-signup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok) {
+                throw new Error(data.error || "Something went wrong. Please try again.");
+              }
+
+              if (barMsg) {
+                barMsg.textContent = "You're on the list!";
+                barMsg.style.color = "#35d06f";
+              }
+
+              barForm.reset();
+            } catch (error) {
+              if (barMsg) {
+                barMsg.textContent = error.message || "Error submitting bar form.";
+                barMsg.style.color = "#ff6b6b";
+              }
+            } finally {
+              if (barBtn) {
+                barBtn.disabled = false;
+                barBtn.textContent = originalText;
+              }
+            }
+          });
+        }
+
+        refreshWaitlistCount();
+        if (!form) return;
+
+        const fullNameEl = document.getElementById("fullName");
+        const emailEl = document.getElementById("email");
+        const phoneEl = document.getElementById("phone");
+        const zipEl = document.getElementById("zip");
+
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          setMessage("Submitting...");
+
+          const fullName = (fullNameEl?.value || "").trim();
+          const email = (emailEl?.value || "").trim();
+          const phone = (phoneEl?.value || "").trim();
+          const zip = (zipEl?.value || "").trim();
+
+          if (!email || !zip) {
+            setMessage("Please enter email + Austin zip code.", true);
+            return;
+          }
+
+          try {
+            const response = await fetch("/api/signup", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ fullName, email, phone, zip }),
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+              setMessage(data.error || "Signup failed. Try again.", true);
+              return;
+            }
+
+            setMessage("You're on the list!");
+            form.reset();
+            refreshWaitlistCount();
+          } catch (error) {
+            setMessage("Network error. Please try again.", true);
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

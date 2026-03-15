@@ -1,0 +1,15 @@
+{
+  "name": "dollar-bar-club",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @dbc/api",
+    "dev:web": "npm run dev -w @dbc/web",
+    "dev:api": "npm run dev -w @dbc/api",
+    "dev:member": "npm run dev -w @dbc/member",
+    "start": "npm run start -w @dbc/api"
+  }
+}

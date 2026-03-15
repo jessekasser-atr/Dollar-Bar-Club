@@ -1,0 +1,10 @@
+node_modules/
+data/dbc.sqlite
+data/dbc.sqlite-wal
+data/dbc.sqlite-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.env
+.codex-logs/
+.claude/

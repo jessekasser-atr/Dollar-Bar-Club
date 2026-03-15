@@ -163,7 +163,6 @@ const upsertVenueStmt = db.prepare(`
   ON CONFLICT(id) DO UPDATE SET
     source = excluded.source,
     source_id = excluded.source_id,
-    enabled = excluded.enabled,
     name = excluded.name,
     city = excluded.city,
     state = excluded.state,

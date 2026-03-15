@@ -38,6 +38,7 @@ function mapBarToVenueRecord(bar) {
     id: `barglance_${bar.id}`,
     source: "barglance",
     sourceId: bar.id,
+    enabled: 0,
     name: bar.name,
     city: bar.city?.name || "",
     state: bar.city?.state || "",

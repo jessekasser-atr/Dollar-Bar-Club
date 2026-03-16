@@ -409,7 +409,7 @@ function offerAdminCard(offer) {
   });
 
   const deleteBtn = document.createElement("button");
-  deleteBtn.className = "secondary danger";
+  deleteBtn.className = "secondary";
   deleteBtn.textContent = "Delete";
   deleteBtn.addEventListener("click", async () => {
     if (!confirm(`Delete offer "${offer.title}"? This cannot be undone.`)) return;
@@ -427,8 +427,8 @@ function offerAdminCard(offer) {
     }
   });
 
-  actions.appendChild(toggleBtn);
   actions.appendChild(useBtn);
+  actions.appendChild(toggleBtn);
   actions.appendChild(deleteBtn);
   wrap.appendChild(actions);
   return wrap;

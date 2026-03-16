@@ -544,7 +544,11 @@ async function renderVenueDetail(venueId) {
         <div class="cta-panel">
           <div>
             <div class="cta-label">When you're there</div>
-            <p>We'll verify your location before unlocking this offer.</p>
+            <ol class="redeem-steps">
+              <li>Tap Redeem below</li>
+              <li>Show the screen to your bartender</li>
+              <li>Press Done once the transaction is complete</li>
+            </ol>
           </div>
           <button class="btn btn-primary" id="redeem-btn">Redeem now</button>
         </div>

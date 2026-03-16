@@ -77,6 +77,9 @@ Single monorepo at `github.com/jessekasser-atr/Dollar-Bar-Club`. Vercel auto-dep
   - Requires `X-Admin-Key`
 - `POST /admin/offers/:id/active`
   - Requires `X-Admin-Key`
+- `DELETE /admin/offers/:id`
+  - Requires `X-Admin-Key`
+  - Deletes the offer and associated member entitlements
 - `GET /venues/:id?membershipToken=...` (single venue with offers and entitlement statuses)
 - `POST /redeem`
   - Requires `membershipToken`, `offerId`, `venueId`
@@ -201,7 +204,12 @@ Managed via Vercel project settings. The serverless functions in `website/api/` 
 - Implemented: Vercel `/api/*` proxy to Render with serverless function passthrough for Supabase endpoints
 - Implemented: admin console deployed at `/admin` with access key gate
 - Implemented: BarGlance venue sync working in production (150 Austin venues imported)
-- Not yet implemented: persistent disk on Render (requires paid tier), durable shared secret management, production-grade rate limiting, final UI pass
+- Implemented: admin offer deletion with entitlement cleanup
+- Implemented: member app UI pass — "Get Directions" link, updated homepage copy, larger offer titles on venue cards
+- Implemented: 3-step redeem instructions on venue detail page (tap Redeem, show screen, press Done)
+- Implemented: "Powered by BarGlance" linked to barglance.com in member app
+- Implemented: Contact nav link and Instagram footer link on marketing site
+- Not yet implemented: persistent disk on Render (requires paid tier), durable shared secret management, production-grade rate limiting
 
 ## Notes
 - This is intentionally minimal for pilot speed.

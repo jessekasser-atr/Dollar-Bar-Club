@@ -50,10 +50,10 @@ Deploys from the `website/` directory of this repo. Serves:
 - `/api/*` (all other paths) → proxied to Render via rewrite
 
 ### Render
-Deploys from the repo root. Runs the Express API (`npm start`) with SQLite at `data/dbc.sqlite`. The database is auto-created with seed data on first boot. Runtime migrations run automatically on startup.
+Deploys from the repo root via public repo URL. Runs the Express API (`npm start`) with SQLite at `data/dbc.sqlite`. The database is auto-created with seed data on first boot. Runtime migrations run automatically on startup. Because the repo is connected as a public URL (not GitHub integration), **Render does not auto-deploy on push** — use Manual Deploy in the Render dashboard after pushing API changes.
 
 ### GitHub
-Single monorepo at `github.com/jessekasser-atr/Dollar-Bar-Club`. Both Vercel and Render deploy from the same repo.
+Single monorepo at `github.com/jessekasser-atr/Dollar-Bar-Club`. Vercel auto-deploys on push. Render requires manual deploy.
 
 ## Pilot Redemption Flow
 1. Member opens the member app and selects an eligible live offer.
@@ -158,9 +158,22 @@ Managed via Vercel project settings. The serverless functions in `website/api/` 
 
 ## Deploying Changes
 - **Push to `main`** → Vercel auto-deploys the website, member app, and admin console
-- **Push to `main`** → Render auto-deploys the API (if connected via GitHub; currently using public repo URL)
+- **Push to `main`** → Render does NOT auto-deploy (public repo URL). Go to Render dashboard > dbc-api > Manual Deploy > Deploy latest commit
 - Member app changes in `apps/member/public/` must be copied to `website/app/` before pushing
 - Admin console changes in `apps/web/public/` must be copied to `website/admin/` before pushing
+
+## Current Production Venues
+- Seed venues (auto-created on boot): The Roosevelt Room, Whisler's
+- BarGlance venues (synced and enabled): Casino El Camino, Continental Club, Lazarus Brewing Co., Radio Coffee & Beer, Zanzibar
+- Active offers:
+  - The Roosevelt Room: `$1 House Cocktail`
+  - Whisler's: `Complimentary Mocktail`
+  - Casino El Camino: `BOGO Wings`
+  - Continental Club: `$1 Stage Door Highball`
+  - Lazarus Brewing Co.: `$1 House Lager`
+  - Radio Coffee & Beer: `$1 Draft Pour`
+  - Zanzibar: `$1 Rooftop Daiquiri`
+- 150 additional Austin BarGlance venues are synced but disabled — enable via the admin console as needed
 
 ## Progress Snapshot
 - Implemented: SQLite-backed memberships, venues, offers, entitlements, and redemption logging
@@ -186,6 +199,8 @@ Managed via Vercel project settings. The serverless functions in `website/api/` 
 - Implemented: curated real Austin BarGlance venues and sample offers for member-app testing
 - Implemented: full production deployment — Vercel (marketing site, member app, admin console) + Render (API)
 - Implemented: Vercel `/api/*` proxy to Render with serverless function passthrough for Supabase endpoints
+- Implemented: admin console deployed at `/admin` with access key gate
+- Implemented: BarGlance venue sync working in production (150 Austin venues imported)
 - Not yet implemented: persistent disk on Render (requires paid tier), durable shared secret management, production-grade rate limiting, final UI pass
 
 ## Notes
@@ -197,5 +212,6 @@ Managed via Vercel project settings. The serverless functions in `website/api/` 
 - Venue data shown to members uses the merged effective profile: curated override values win, synced/base values fill gaps.
 - The admin console uses a shared `ADMIN_ACCESS_KEY` gate rather than a full user account system.
 - Rate limiters are in-memory and reset when the API process restarts.
-- On Render free tier, the SQLite database resets on each deploy/restart. Seed data is recreated automatically. Upgrade to a paid tier with persistent disk for durable storage.
+- On Render free tier, the SQLite database resets on each deploy/restart. Seed data is recreated automatically, but synced venues, offers, members, and redemptions are lost. Re-run BarGlance sync and re-enable venues after each redeploy. Upgrade to a paid tier with persistent disk for durable storage.
+- BarGlance sync imports venues as disabled by default. Re-syncing updates venue metadata without resetting the enabled/disabled state.
 - Member app styling is aligned with the `website/` brand direction.

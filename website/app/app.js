@@ -546,7 +546,7 @@ async function renderVenueDetail(venueId) {
             <div class="cta-label">When you're there</div>
             <ol class="redeem-steps">
               <li>Tap Redeem below</li>
-              <li>Show the screen to your bartender</li>
+              <li>Show the screen to your bartender/server</li>
               <li>Press Done once the transaction is complete</li>
             </ol>
           </div>

@@ -86,7 +86,7 @@ function shell(content, options = {}) {
 
   return `
     <div class="powered-by">
-      Powered by <span class="brand">BarGlance</span>
+      <a href="https://www.barglance.com/" target="_blank" rel="noopener noreferrer">Powered by <span class="brand">BarGlance</span></a>
     </div>
     <div class="app-shell">
       <div class="nav">

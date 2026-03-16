@@ -128,6 +128,10 @@
         color: var(--danger);
         border-color: var(--danger);
       }
+      button.danger {
+        background: var(--danger);
+        color: #fff;
+      }
 
       /* Toolbar row */
       .toolbar {
@@ -264,6 +268,11 @@
     </style>
   </head>
   <body>
+    <script>
+      if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+        window.__DBC_API_BASE__ = "https://dbc-api.onrender.com";
+      }
+    </script>
     <div id="app"></div>
 
     <template id="ops-template">

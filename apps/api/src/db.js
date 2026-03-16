@@ -974,11 +974,27 @@ function setOfferActive(offerId, isActive) {
   };
 }
 
+const deleteOfferStmt = db.prepare("DELETE FROM offers WHERE id = ?");
+const deleteEntitlementsByOfferStmt = db.prepare("DELETE FROM member_offers WHERE offer_id = ?");
+
+function deleteOffer(offerId) {
+  const offer = mapOffer(findOfferByIdStmt.get(offerId));
+  if (!offer) {
+    return { ok: false, statusCode: 404, reason: "offer_not_found" };
+  }
+
+  deleteEntitlementsByOfferStmt.run(offerId);
+  deleteOfferStmt.run(offerId);
+
+  return { ok: true, deletedOfferId: offerId };
+}
+
 export {
   claimMembership,
   createOffer,
   createVenue,
   DB_PATH,
+  deleteOffer,
   getActiveOffers,
   getCounts,
   getVenueById,

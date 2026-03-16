@@ -408,8 +408,28 @@ function offerAdminCard(offer) {
     });
   });
 
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "secondary danger";
+  deleteBtn.textContent = "Delete";
+  deleteBtn.addEventListener("click", async () => {
+    if (!confirm(`Delete offer "${offer.title}"? This cannot be undone.`)) return;
+    deleteBtn.disabled = true;
+    try {
+      const data = await jsonFetch(`/admin/offers/${encodeURIComponent(offer.id)}`, {
+        method: "DELETE",
+        headers: getAdminHeaders()
+      });
+      renderResult(true, data);
+      await loadAdminOffers();
+    } catch (error) {
+      renderResult(false, { ok: false, reason: "delete_offer_failed", error: String(error) });
+      deleteBtn.disabled = false;
+    }
+  });
+
   actions.appendChild(toggleBtn);
   actions.appendChild(useBtn);
+  actions.appendChild(deleteBtn);
   wrap.appendChild(actions);
   return wrap;
 }

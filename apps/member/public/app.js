@@ -414,7 +414,7 @@ async function renderVenueList() {
         `
           <section class="member-summary">
             <div>
-              <h2>${counts.live ? "Choose a location and claim your drink special." : "Your redeemed venues are saved here."}</h2>
+              <h2>${counts.live ? "Pick a bar and unlock your member offer." : "Your redeemed venues are saved here."}</h2>
             </div>
             <div class="summary-pill">${venueOffers.length} ${venueOffers.length === 1 ? "offer" : "offers"}</div>
           </section>
@@ -594,7 +594,7 @@ async function renderVenueDetail(venueId) {
 
           <section class="panel">
             <a class="detail-directions" href="${mapsUrl}" target="_blank" rel="noopener">
-              Open in maps
+              Get Directions
               <span>${escapeHtml(venue.address || "Directions")}</span>
             </a>
           </section>

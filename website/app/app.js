@@ -341,57 +341,63 @@ async function renderVenueList() {
       return;
     }
 
-    const venueOffers = Array.from(
-      offers.reduce((map, offer) => {
-        const venue = offer.venue || {};
-        if (!venue.id) {
-          return map;
-        }
-
-        const existing = map.get(venue.id);
-        map.set(venue.id, chooseVenueOffer(existing, offer));
-        return map;
-      }, new Map()).values()
-    );
-
-    venueOffers.sort((left, right) => {
-      const leftRedeemed = left.entitlementStatus === "redeemed";
-      const rightRedeemed = right.entitlementStatus === "redeemed";
-      if (leftRedeemed !== rightRedeemed) {
-        return leftRedeemed ? 1 : -1;
+    const venueGroupMap = new Map();
+    offers.forEach((offer) => {
+      const venue = offer.venue || {};
+      if (!venue.id) return;
+      if (!venueGroupMap.has(venue.id)) {
+        venueGroupMap.set(venue.id, { venue, offers: [] });
       }
-
-      const leftCreatedAt = Date.parse(left.createdAt || 0);
-      const rightCreatedAt = Date.parse(right.createdAt || 0);
-      if (Number.isFinite(leftCreatedAt) && Number.isFinite(rightCreatedAt) && leftCreatedAt !== rightCreatedAt) {
-        return rightCreatedAt - leftCreatedAt;
-      }
-
-      return (left.venue?.name || "").localeCompare(right.venue?.name || "");
+      venueGroupMap.get(venue.id).offers.push(offer);
     });
 
-    const cards = venueOffers
-      .map((offer) => {
-        const venue = offer.venue || {};
-        const isRedeemed = offer.entitlementStatus === "redeemed";
+    const venueGroups = Array.from(venueGroupMap.values());
+
+    venueGroups.forEach((group) => {
+      group.offers.sort((a, b) => {
+        const aR = a.entitlementStatus === "redeemed" ? 1 : 0;
+        const bR = b.entitlementStatus === "redeemed" ? 1 : 0;
+        if (aR !== bR) return aR - bR;
+        return Date.parse(b.endsAt || 0) - Date.parse(a.endsAt || 0);
+      });
+      group.primary = group.offers[0];
+      group.allRedeemed = group.offers.every((o) => o.entitlementStatus === "redeemed");
+    });
+
+    venueGroups.sort((left, right) => {
+      if (left.allRedeemed !== right.allRedeemed) {
+        return left.allRedeemed ? 1 : -1;
+      }
+      return (left.venue.name || "").localeCompare(right.venue.name || "");
+    });
+
+    const cards = venueGroups
+      .map((group) => {
+        const venue = group.venue;
+        const primary = group.primary;
+        const extra = group.offers.length - 1;
+        const isRedeemed = group.allRedeemed;
         const cardClass = isRedeemed ? "venue-card is-redeemed" : "venue-card";
         const metaParts = [
           venue.neighborhood || venue.city,
           venueSignal(venue),
           priceLevelLabel(venue.priceLevel)
         ].filter(Boolean);
-        const when = isRedeemed && offer.redeemedAt
-          ? `Redeemed ${escapeHtml(formatDateTime(offer.redeemedAt))}`
-          : `Ends ${escapeHtml(formatDateTime(offer.endsAt))}`;
+        const when = isRedeemed && primary.redeemedAt
+          ? `Redeemed ${escapeHtml(formatDateTime(primary.redeemedAt))}`
+          : `Ends ${escapeHtml(formatDateTime(primary.endsAt))}`;
+        const offerLine = extra > 0
+          ? `${escapeHtml(primary.title)} <span class="offer-more">+${extra} more</span>`
+          : escapeHtml(primary.title);
 
         return `
           <a class="${cardClass}" href="#/venue/${escapeHtml(venue.id || "")}" data-venue-id="${escapeHtml(venue.id || "")}">
             <div class="venue-media">
-              ${imageMarkup(offer.imageUrl || venue.imageUrl, venue.name || "Venue", "venue-card-image", venue.name || offer.title, "image-fallback-tall")}
+              ${imageMarkup(primary.imageUrl || venue.imageUrl, venue.name || "Venue", "venue-card-image", venue.name || primary.title, "image-fallback-tall")}
               <div class="venue-media-gradient"></div>
               <div class="venue-media-copy">
                 <h3>${escapeHtml(venue.name || "Venue")}</h3>
-                <p>${escapeHtml(offer.title)}</p>
+                <p>${offerLine}</p>
               </div>
             </div>
             <div class="venue-card-body">
@@ -407,7 +413,8 @@ async function renderVenueList() {
       })
       .join("");
 
-    const counts = getVenueCounts(venueOffers);
+    const liveCount = venueGroups.filter((g) => !g.allRedeemed).length;
+    const counts = { live: liveCount, redeemed: venueGroups.length - liveCount };
 
     render(
       shell(
@@ -416,7 +423,7 @@ async function renderVenueList() {
             <div>
               <h2>${counts.live ? "Pick a bar and unlock your member offer." : "Your redeemed venues are saved here."}</h2>
             </div>
-            <div class="summary-pill">${venueOffers.length} ${venueOffers.length === 1 ? "offer" : "offers"}</div>
+            <div class="summary-pill">${venueGroups.length} ${venueGroups.length === 1 ? "venue" : "venues"}</div>
           </section>
           <section class="venue-list">${cards}</section>
         `,
@@ -511,9 +518,14 @@ async function renderVenueDetail(venueId) {
   try {
     const data = await api("GET", `/venues/${venueId}?membershipToken=${encodeURIComponent(token)}`);
     const venue = data.venue;
-    const offer = selectPrimaryOffer(data.offers || []);
-    const isRedeemed = offer?.entitlementStatus === "redeemed";
-    const when = offer?.redeemedAt ? formatDateTime(offer.redeemedAt) : "";
+    const allOffers = (data.offers || []).slice();
+    allOffers.sort((a, b) => {
+      const aR = a.entitlementStatus === "redeemed" ? 1 : 0;
+      const bR = b.entitlementStatus === "redeemed" ? 1 : 0;
+      if (aR !== bR) return aR - bR;
+      return Date.parse(b.endsAt || 0) - Date.parse(a.endsAt || 0);
+    });
+    const hasLiveOffers = allOffers.some((o) => o.entitlementStatus !== "redeemed");
     const mapsUrl = `https://maps.google.com/maps?q=${encodeURIComponent(venue.address || `${venue.name}, Austin, TX`)}`;
     const infoMarkup = buildDetailInfo(venue);
     const hoursMarkup = formatHoursSummary(venue.hoursSummary);
@@ -524,35 +536,59 @@ async function renderVenueDetail(venueId) {
       priceLevelLabel(venue.priceLevel) || null
     ].filter(Boolean);
 
-    let ctaMarkup = "";
-    if (!offer) {
-      ctaMarkup = `
-        <div class="info-banner muted-banner">
-          <strong>No live member offer right now</strong>
-          <span>${escapeHtml(venue.name)} is still part of Dollar Bar Club. Check back soon for the next live offer.</span>
-        </div>
-      `;
-    } else if (isRedeemed) {
-      ctaMarkup = `
-        <div class="info-banner success-banner">
-          <strong>Offer already redeemed</strong>
-          <span>${when ? `Redeemed ${escapeHtml(when)}. You can still use this page for venue details and directions.` : "You have already used this offer."}</span>
-        </div>
+    let offersMarkup = "";
+    if (!allOffers.length) {
+      offersMarkup = `
+        <section class="panel">
+          <div class="info-banner muted-banner">
+            <strong>No live member offer right now</strong>
+            <span>${escapeHtml(venue.name)} is still part of Dollar Bar Club. Check back soon for the next live offer.</span>
+          </div>
+        </section>
       `;
     } else {
-      ctaMarkup = `
-        <div class="cta-panel">
-          <div>
-            <div class="cta-label">When you're there</div>
-            <ol class="redeem-steps">
-              <li>Tap Redeem below</li>
-              <li>Show the screen to your bartender/server</li>
-              <li>Press Done once the transaction is complete</li>
-            </ol>
+      const instructionsMarkup = hasLiveOffers ? `
+        <section class="panel">
+          <div class="cta-panel">
+            <div>
+              <div class="cta-label">When you're there</div>
+              <ol class="redeem-steps">
+                <li>Tap Redeem below</li>
+                <li>Show the screen to your bartender/server</li>
+                <li>Press Done once the transaction is complete</li>
+              </ol>
+            </div>
           </div>
-          <button class="btn btn-primary" id="redeem-btn">Redeem now</button>
-        </div>
-      `;
+        </section>
+      ` : "";
+
+      const offerBlocks = allOffers.map((offer, idx) => {
+        const isRedeemed = offer.entitlementStatus === "redeemed";
+        const when = offer.redeemedAt ? formatDateTime(offer.redeemedAt) : "";
+        let ctaMarkup = "";
+        if (isRedeemed) {
+          ctaMarkup = `
+            <div class="info-banner success-banner" style="margin-top:10px;">
+              <strong>Redeemed</strong>
+              <span>${when ? escapeHtml(when) : "You have already used this offer."}</span>
+            </div>
+          `;
+        } else {
+          ctaMarkup = `<button class="btn btn-primary redeem-offer-btn" data-offer-idx="${idx}" style="margin-top:10px;">Redeem now</button>`;
+        }
+
+        return `
+          <section class="panel">
+            <div class="section-kicker">${allOffers.length > 1 ? `Offer ${idx + 1} of ${allOffers.length}` : "Your offer"}</div>
+            <div class="detail-offer-title">${escapeHtml(offer.title)}</div>
+            <div class="detail-offer-desc">${escapeHtml(offer.description || "One-time pilot offer for active members.")}</div>
+            <div class="detail-window">Valid until ${escapeHtml(formatDateTime(offer.endsAt))}</div>
+            ${ctaMarkup}
+          </section>
+        `;
+      }).join("");
+
+      offersMarkup = instructionsMarkup + offerBlocks;
     }
 
     render(
@@ -570,22 +606,7 @@ async function renderVenueDetail(venueId) {
             </div>
           </section>
 
-          ${
-            offer
-              ? `
-                <section class="panel">
-                  <div class="section-kicker">Your offer</div>
-                  <div class="detail-offer-title">${escapeHtml(offer.title)}</div>
-                  <div class="detail-offer-desc">${escapeHtml(offer.description || "One-time pilot offer for active members.")}</div>
-                  <div class="detail-window">Valid until ${escapeHtml(formatDateTime(offer.endsAt))}</div>
-                </section>
-              `
-              : ""
-          }
-
-          <section class="panel">
-            ${ctaMarkup}
-          </section>
+          ${offersMarkup}
 
           ${
             hoursMarkup || infoMarkup
@@ -607,11 +628,13 @@ async function renderVenueDetail(venueId) {
       )
     );
 
-    if (!isRedeemed && offer) {
-      document.getElementById("redeem-btn")?.addEventListener("click", () => {
-        startRedemption(venue, offer);
-      });
-    }
+    document.querySelectorAll(".redeem-offer-btn").forEach((btn) => {
+      const idx = Number(btn.dataset.offerIdx);
+      const offer = allOffers[idx];
+      if (offer) {
+        btn.addEventListener("click", () => startRedemption(venue, offer));
+      }
+    });
   } catch (error) {
     if (error.data?.reason === "membership_not_found") {
       clearToken();

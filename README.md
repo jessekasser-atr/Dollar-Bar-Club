@@ -50,7 +50,7 @@ Deploys from the `website/` directory of this repo. Serves:
 - `/api/*` (all other paths) → proxied to Render via rewrite
 
 ### Render
-Deploys from the repo root via public repo URL. Runs the Express API (`npm start`) with SQLite at `data/dbc.sqlite`. The database is auto-created with seed data on first boot. Runtime migrations run automatically on startup. Because the repo is connected as a public URL (not GitHub integration), **Render does not auto-deploy on push** — use Manual Deploy in the Render dashboard after pushing API changes.
+Deploys from the repo root via public repo URL. Runs the Express API (`npm start`) with SQLite at `data/dbc.sqlite` on a persistent disk (paid tier, $7/mo). The database is auto-created with seed data on first boot. Runtime migrations run automatically on startup. Because the repo is connected as a public URL (not GitHub integration), **Render does not auto-deploy on push** — use Manual Deploy in the Render dashboard after pushing API changes.
 
 ### GitHub
 Single monorepo at `github.com/jessekasser-atr/Dollar-Bar-Club`. Vercel auto-deploys on push. Render requires manual deploy.
@@ -80,6 +80,9 @@ Single monorepo at `github.com/jessekasser-atr/Dollar-Bar-Club`. Vercel auto-dep
 - `DELETE /admin/offers/:id`
   - Requires `X-Admin-Key`
   - Deletes the offer and associated member entitlements
+- `DELETE /admin/venues/:id`
+  - Requires `X-Admin-Key`
+  - Deletes the venue, its offers, and associated member entitlements
 - `GET /venues/:id?membershipToken=...` (single venue with offers and entitlement statuses)
 - `POST /redeem`
   - Requires `membershipToken`, `offerId`, `venueId`
@@ -138,7 +141,7 @@ Managed via Vercel project settings. The serverless functions in `website/api/` 
 | `FROM_EMAIL` | Optional | Sender email for transactional emails |
 
 ## Production Config
-- Database: SQLite at `data/dbc.sqlite` on Render (ephemeral on free tier, persistent on paid with disk)
+- Database: SQLite at `data/dbc.sqlite` on Render (paid tier with persistent disk)
 - API CORS: allowlisted via `ALLOWED_ORIGINS` (production: `https://dollarbarclub.com`)
 - Admin auth: shared `ADMIN_ACCESS_KEY` gate — the admin console prompts for it before loading, API routes validate via `X-Admin-Key` header
 - Member app API base: resolves to `/api` in production (same-origin, proxied to Render by Vercel)
@@ -146,7 +149,7 @@ Managed via Vercel project settings. The serverless functions in `website/api/` 
 - Rate limiting: in-memory, resets on API restart
   - `POST /memberships/claim`: 5 requests per IP per 15 minutes
   - `POST /redeem`: 12 requests per IP per 5 minutes
-- Render free tier: API spins down after ~15 min of inactivity, first request takes ~30s to wake
+- Render paid tier ($7/mo): persistent disk, no spin-down, always-on
 - Venue profile source of truth:
   - BarGlance sync provides the base venue data layer
   - Local curated profile fields override the base layer for member-facing display
@@ -209,7 +212,11 @@ Managed via Vercel project settings. The serverless functions in `website/api/` 
 - Implemented: 3-step redeem instructions on venue detail page (tap Redeem, show screen, press Done)
 - Implemented: "Powered by BarGlance" linked to barglance.com in member app
 - Implemented: Contact nav link and Instagram footer link on marketing site
-- Not yet implemented: persistent disk on Render (requires paid tier), durable shared secret management, production-grade rate limiting
+- Implemented: multi-offer support — venues can have multiple offers, each with independent Redeem flow
+- Implemented: venue list cards show first offer title + "+X more" when multiple offers exist
+- Implemented: admin venue deletion with cascade cleanup (offers + entitlements)
+- Implemented: Render upgraded to paid tier with persistent disk — database survives restarts
+- Not yet implemented: durable shared secret management, production-grade rate limiting
 
 ## Notes
 - This is intentionally minimal for pilot speed.
@@ -220,6 +227,6 @@ Managed via Vercel project settings. The serverless functions in `website/api/` 
 - Venue data shown to members uses the merged effective profile: curated override values win, synced/base values fill gaps.
 - The admin console uses a shared `ADMIN_ACCESS_KEY` gate rather than a full user account system.
 - Rate limiters are in-memory and reset when the API process restarts.
-- On Render free tier, the SQLite database resets on each deploy/restart. Seed data is recreated automatically, but synced venues, offers, members, and redemptions are lost. Re-run BarGlance sync and re-enable venues after each redeploy. Upgrade to a paid tier with persistent disk for durable storage.
+- Render is on the paid tier with persistent disk. The SQLite database persists across deploys and restarts. Seed data is only created on first boot if the database does not already exist.
 - BarGlance sync imports venues as disabled by default. Re-syncing updates venue metadata without resetting the enabled/disabled state.
 - Member app styling is aligned with the `website/` brand direction.

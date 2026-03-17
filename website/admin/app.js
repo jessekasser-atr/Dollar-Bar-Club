@@ -400,6 +400,8 @@ function offerAdminCard(offer) {
     ui.newOfferVenueIdEl.value = offer.venueId;
     ui.selectedVenueSummaryEl.textContent = `Selected venue: ${offer.venueName || offer.venueId} (${offer.venueId})`;
     ui.selectedVenueSummaryEl.style.color = "#0a66ff";
+    ui.newOfferVenueIdEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    ui.newOfferTitleEl.focus();
     renderResult(true, {
       ok: true,
       status: "offer_selected",

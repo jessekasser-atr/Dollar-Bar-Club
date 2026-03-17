@@ -989,12 +989,38 @@ function deleteOffer(offerId) {
   return { ok: true, deletedOfferId: offerId };
 }
 
+const deleteVenueStmt = db.prepare("DELETE FROM venues WHERE id = ?");
+const deleteOffersByVenueStmt = db.prepare("DELETE FROM offers WHERE venue_id = ?");
+const findOfferIdsByVenueStmt = db.prepare("SELECT id FROM offers WHERE venue_id = ?");
+const deleteEntitlementsByOfferBatchStmt = db.prepare("DELETE FROM member_offers WHERE offer_id = ?");
+
+const deleteVenueTxn = db.transaction((venueId) => {
+  const venue = getVenueById(venueId);
+  if (!venue) {
+    return { ok: false, statusCode: 404, reason: "venue_not_found" };
+  }
+
+  const offerIds = findOfferIdsByVenueStmt.all(venueId).map((r) => r.id);
+  for (const oid of offerIds) {
+    deleteEntitlementsByOfferBatchStmt.run(oid);
+  }
+  deleteOffersByVenueStmt.run(venueId);
+  deleteVenueStmt.run(venueId);
+
+  return { ok: true, deletedVenueId: venueId, deletedOffers: offerIds.length };
+});
+
+function deleteVenue(venueId) {
+  return deleteVenueTxn(venueId);
+}
+
 export {
   claimMembership,
   createOffer,
   createVenue,
   DB_PATH,
   deleteOffer,
+  deleteVenue,
   getActiveOffers,
   getCounts,
   getVenueById,

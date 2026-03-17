@@ -345,9 +345,30 @@ function venueAdminCard(venue) {
     switchTab("offers");
   });
 
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "secondary";
+  deleteBtn.textContent = "Delete";
+  deleteBtn.addEventListener("click", async () => {
+    if (!confirm(`Delete venue "${venue.name}"? This will also delete all offers for this venue. This cannot be undone.`)) return;
+    deleteBtn.disabled = true;
+    try {
+      const data = await jsonFetch(`/admin/venues/${encodeURIComponent(venue.id)}`, {
+        method: "DELETE",
+        headers: getAdminHeaders()
+      });
+      renderResult(true, data);
+      await loadVenueAdminList();
+      await loadAdminOffers();
+    } catch (error) {
+      renderResult(false, { ok: false, reason: "delete_venue_failed", error: String(error) });
+      deleteBtn.disabled = false;
+    }
+  });
+
   actions.appendChild(toggleBtn);
   actions.appendChild(editBtn);
   actions.appendChild(useBtn);
+  actions.appendChild(deleteBtn);
   wrap.appendChild(actions);
   return wrap;
 }

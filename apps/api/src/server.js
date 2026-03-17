@@ -6,6 +6,7 @@ import {
   createVenue,
   DB_PATH,
   deleteOffer,
+  deleteVenue,
   getActiveOffers,
   getCounts,
   listOffers,
@@ -289,6 +290,16 @@ app.post("/admin/offers/:id/active", requireAdminAccess, (req, res) => {
 
 app.delete("/admin/offers/:id", requireAdminAccess, (req, res) => {
   const result = deleteOffer(req.params.id);
+
+  if (!result.ok) {
+    return res.status(result.statusCode).json({ ok: false, reason: result.reason });
+  }
+
+  return res.json(result);
+});
+
+app.delete("/admin/venues/:id", requireAdminAccess, (req, res) => {
+  const result = deleteVenue(req.params.id);
 
   if (!result.ok) {
     return res.status(result.statusCode).json({ ok: false, reason: result.reason });

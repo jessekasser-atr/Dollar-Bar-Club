@@ -611,6 +611,8 @@ async function renderVenueDetail(venueId) {
             </div>
           </section>
 
+          ${venue.description ? `<section class="panel"><p class="venue-description">${escapeHtml(venue.description)}</p></section>` : ""}
+
           ${offersMarkup}
 
           ${

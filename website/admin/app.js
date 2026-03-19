@@ -334,8 +334,8 @@ function venueAdminCard(venue) {
   });
 
   const featuredBtn = document.createElement("button");
-  featuredBtn.className = venue.featured ? "secondary" : "";
-  featuredBtn.textContent = venue.featured ? "Unfeature" : "Feature";
+  featuredBtn.className = venue.featured ? "" : "secondary";
+  featuredBtn.textContent = venue.featured ? "Featured ✓" : "Feature";
   featuredBtn.addEventListener("click", async () => {
     featuredBtn.disabled = true;
     try {

@@ -382,7 +382,8 @@ async function renderVenueList() {
         const primary = group.primary;
         const extra = group.offers.length - 1;
         const isRedeemed = group.allRedeemed;
-        const cardClass = isRedeemed ? "venue-card is-redeemed" : "venue-card";
+        const isFeatured = venue.featured && !isRedeemed;
+        const cardClass = `venue-card${isRedeemed ? " is-redeemed" : ""}${isFeatured ? " is-featured" : ""}`;
         const metaParts = [
           venue.neighborhood || venue.city,
           venueSignal(venue),
@@ -398,6 +399,7 @@ async function renderVenueList() {
         return `
           <a class="${cardClass}" href="#/venue/${escapeHtml(venue.id || "")}" data-venue-id="${escapeHtml(venue.id || "")}">
             <div class="venue-media">
+              ${isFeatured ? '<span class="featured-star">⭐</span>' : ""}
               ${imageMarkup(primary.imageUrl || venue.imageUrl, venue.name || "Venue", "venue-card-image", venue.name || primary.title, "image-fallback-tall")}
               <div class="venue-media-gradient"></div>
               <div class="venue-media-copy">

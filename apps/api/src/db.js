@@ -63,6 +63,7 @@ function mapVenue(row) {
         source: row.source || "local",
         sourceId: row.source_id || null,
         enabled: Boolean(row.enabled),
+        featured: Boolean(row.featured),
         name: pickVenueDisplayValue(row.display_name, row.name),
         city: row.city,
         state: row.state,
@@ -918,6 +919,22 @@ function setVenueEnabled(venueId, enabled) {
   };
 }
 
+const updateVenueFeaturedStmt = db.prepare("UPDATE venues SET featured = ? WHERE id = ?");
+
+function setVenueFeatured(venueId, featured) {
+  const venue = getVenueById(venueId);
+  if (!venue) {
+    return { ok: false, statusCode: 404, reason: "venue_not_found" };
+  }
+
+  updateVenueFeaturedStmt.run(featured ? 1 : 0, venueId);
+
+  return {
+    ok: true,
+    venue: getVenueById(venueId)
+  };
+}
+
 const updateVenueProfileTxn = db.transaction((venueId, profile) => {
   const venue = getVenueById(venueId);
   if (!venue) {
@@ -1033,6 +1050,7 @@ export {
   clearVenueProfile,
   setOfferActive,
   setVenueEnabled,
+  setVenueFeatured,
   syncBarglanceCity,
   updateVenueProfile
 };

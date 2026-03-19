@@ -365,6 +365,11 @@ async function renderVenueList() {
     });
 
     venueGroups.sort((left, right) => {
+      const leftFeatured = left.venue.featured ? 1 : 0;
+      const rightFeatured = right.venue.featured ? 1 : 0;
+      if (leftFeatured !== rightFeatured) {
+        return rightFeatured - leftFeatured;
+      }
       if (left.allRedeemed !== right.allRedeemed) {
         return left.allRedeemed ? 1 : -1;
       }

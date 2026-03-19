@@ -298,6 +298,7 @@ function venueAdminCard(venue) {
     <div class="pill-row">
       <span class="pill ${venue.enabled ? "pill-ok" : "pill-muted"}">${venue.enabled ? "Enabled" : "Disabled"}</span>
       <span class="pill pill-muted">${venue.source || "local"}</span>
+      ${venue.featured ? '<span class="pill pill-ok">Featured</span>' : ""}
       ${venue.hasOverrides ? '<span class="pill pill-accent">Curated</span>' : ""}
       ${venue.openNow === true ? '<span class="pill pill-ok">Open now</span>' : ""}
     </div>
@@ -329,6 +330,25 @@ function venueAdminCard(venue) {
     } catch (error) {
       renderResult(false, { ok: false, reason: "toggle_venue_failed", error: String(error) });
       toggleBtn.disabled = false;
+    }
+  });
+
+  const featuredBtn = document.createElement("button");
+  featuredBtn.className = venue.featured ? "secondary" : "";
+  featuredBtn.textContent = venue.featured ? "Unfeature" : "Feature";
+  featuredBtn.addEventListener("click", async () => {
+    featuredBtn.disabled = true;
+    try {
+      const data = await jsonFetch(`/admin/venues/${encodeURIComponent(venue.id)}/featured`, {
+        method: "POST",
+        headers: getAdminHeaders(),
+        body: JSON.stringify({ featured: !venue.featured })
+      });
+      renderResult(true, data);
+      await loadVenueAdminList();
+    } catch (error) {
+      renderResult(false, { ok: false, reason: "toggle_featured_failed", error: String(error) });
+      featuredBtn.disabled = false;
     }
   });
 
@@ -366,6 +386,7 @@ function venueAdminCard(venue) {
   });
 
   actions.appendChild(toggleBtn);
+  actions.appendChild(featuredBtn);
   actions.appendChild(editBtn);
   actions.appendChild(useBtn);
   actions.appendChild(deleteBtn);

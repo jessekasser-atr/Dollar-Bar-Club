@@ -17,6 +17,7 @@ import {
   redeemOffer,
   setOfferActive,
   setVenueEnabled,
+  setVenueFeatured,
   syncBarglanceCity,
   updateVenueProfile
 } from "./db.js";
@@ -385,6 +386,16 @@ app.post("/admin/venues", requireAdminAccess, (req, res) => {
 
 app.post("/admin/venues/:id/enabled", requireAdminAccess, (req, res) => {
   const result = setVenueEnabled(req.params.id, Boolean(req.body?.enabled));
+
+  if (!result.ok) {
+    return res.status(result.statusCode).json({ ok: false, reason: result.reason });
+  }
+
+  return res.json(result);
+});
+
+app.post("/admin/venues/:id/featured", requireAdminAccess, (req, res) => {
+  const result = setVenueFeatured(req.params.id, Boolean(req.body?.featured));
 
   if (!result.ok) {
     return res.status(result.statusCode).json({ ok: false, reason: result.reason });

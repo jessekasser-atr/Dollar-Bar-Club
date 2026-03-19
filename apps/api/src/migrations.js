@@ -281,6 +281,12 @@ const migrations = [
       ensureColumn(db, "venues", "display_neighborhood", "display_neighborhood TEXT");
       ensureColumn(db, "venues", "display_type", "display_type TEXT");
     }
+  },
+  {
+    id: "007_venue_featured",
+    run(db) {
+      ensureColumn(db, "venues", "featured", "featured INTEGER NOT NULL DEFAULT 0");
+    }
   }
 ];
 

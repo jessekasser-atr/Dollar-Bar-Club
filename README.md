@@ -98,6 +98,9 @@ Single monorepo at `github.com/jessekasser-atr/Dollar-Bar-Club`. Vercel auto-dep
   - Requires `X-Admin-Key`
 - `POST /admin/venues/:id/profile/reset`
   - Requires `X-Admin-Key`
+- `POST /admin/venues/:id/featured`
+  - Requires `X-Admin-Key`
+  - Toggles the venue's featured status (pinned to top of member app)
 - `POST /admin/sync/barglance`
   - Requires `X-Admin-Key`
 - `GET /admin/redemptions`
@@ -216,6 +219,10 @@ Managed via Vercel project settings. The serverless functions in `website/api/` 
 - Implemented: venue list cards show first offer title + "+X more" when multiple offers exist
 - Implemented: admin venue deletion with cascade cleanup (offers + entitlements)
 - Implemented: Render upgraded to paid tier with persistent disk — database survives restarts
+- Implemented: featured venue pinning — admin toggle, DB migration, API endpoint, member app sorts featured to top
+- Implemented: featured venue visual highlight — gold star icon and faint gold border on featured venue cards in member app
+- Implemented: venue description displayed on member app detail page (below offers)
+- Implemented: branded $ favicon across marketing site, member app, and admin console
 - Not yet implemented: durable shared secret management, production-grade rate limiting
 
 ## Notes

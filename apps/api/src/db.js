@@ -317,7 +317,8 @@ const listActiveOffersStmt = db.prepare(`
     v.hours_summary AS venue_hours_summary,
     v.rating AS venue_rating,
     v.review_count AS venue_review_count,
-    v.created_at AS venue_created_at
+    v.created_at AS venue_created_at,
+    v.featured AS venue_featured
   FROM offers o
   JOIN venues v ON v.id = o.venue_id
   WHERE o.is_active = 1
@@ -329,13 +330,13 @@ const listActiveOffersStmt = db.prepare(`
 `);
 
 const findVenueByIdStmt = db.prepare(`
-  SELECT id, source, source_id, enabled, name, display_name, city, state, address, display_address, neighborhood, display_neighborhood, type, display_type, description, display_description, image_url, display_image_url, website, display_website, phone, display_phone, instagram, lat, lng, open_now, price_level, hours_summary, rating, review_count, created_at
+  SELECT id, source, source_id, enabled, featured, name, display_name, city, state, address, display_address, neighborhood, display_neighborhood, type, display_type, description, display_description, image_url, display_image_url, website, display_website, phone, display_phone, instagram, lat, lng, open_now, price_level, hours_summary, rating, review_count, created_at
   FROM venues
   WHERE id = ?
 `);
 
 const listVenuesStmt = db.prepare(`
-  SELECT id, source, source_id, enabled, name, display_name, city, state, address, display_address, neighborhood, display_neighborhood, type, display_type, description, display_description, image_url, display_image_url, website, display_website, phone, display_phone, instagram, lat, lng, open_now, price_level, hours_summary, rating, review_count, created_at
+  SELECT id, source, source_id, enabled, featured, name, display_name, city, state, address, display_address, neighborhood, display_neighborhood, type, display_type, description, display_description, image_url, display_image_url, website, display_website, phone, display_phone, instagram, lat, lng, open_now, price_level, hours_summary, rating, review_count, created_at
   FROM venues
   WHERE (@enabledOnly = 0 OR enabled = 1)
   ORDER BY name ASC
@@ -551,7 +552,8 @@ function hydrateOfferRow(row) {
     hours_summary: row.venue_hours_summary,
     rating: row.venue_rating,
     review_count: row.venue_review_count,
-    created_at: row.venue_created_at
+    created_at: row.venue_created_at,
+    featured: row.venue_featured
   });
 
   return { ...offer, venue };

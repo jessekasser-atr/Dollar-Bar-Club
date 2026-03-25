@@ -149,6 +149,9 @@ function switchTab(tabId) {
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.tab === tabId);
   });
+  if (tabId === "members" && allMembers.length === 0) {
+    loadMemberList();
+  }
 }
 
 function escapeHtml(value) {

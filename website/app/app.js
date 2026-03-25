@@ -403,11 +403,11 @@ async function renderVenueList() {
             </div>
             <div class="venue-card-body">
               <div class="venue-card-meta">${escapeHtml(metaParts.join(" | "))}</div>
-              <div class="venue-card-address">${escapeHtml(venue.address || "Austin, TX")}</div>
               <div class="venue-card-footer">
-                <div class="venue-meta">${when}</div>
+                <div class="venue-card-address">${escapeHtml(venue.address || "Austin, TX")}</div>
                 <div class="venue-card-arrow">${isRedeemed ? "Details" : "View"}</div>
               </div>
+              ${when ? `<div class="venue-meta">${when}</div>` : ""}
             </div>
           </a>
         `;
@@ -823,6 +823,7 @@ function onGeoError(venue) {
 }
 
 function onRouteChange() {
+  window.scrollTo(0, 0);
   const token = getToken();
   const route = getRoute();
 

@@ -355,7 +355,9 @@ const updateVenueProfileStmt = db.prepare(`
       display_website = ?,
       display_phone = ?,
       display_neighborhood = ?,
-      display_type = ?
+      display_type = ?,
+      lat = COALESCE(?, lat),
+      lng = COALESCE(?, lng)
   WHERE id = ?
 `);
 
@@ -954,6 +956,8 @@ const updateVenueProfileTxn = db.transaction((venueId, profile) => {
     profile.phone,
     profile.neighborhood,
     profile.type,
+    profile.lat,
+    profile.lng,
     venueId
   );
 

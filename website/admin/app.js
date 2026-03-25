@@ -125,6 +125,8 @@ function renderOpsApp() {
     profileVenueNameEl: document.getElementById("profileVenueName"),
     profileVenueImageUrlEl: document.getElementById("profileVenueImageUrl"),
     profileVenueAddressEl: document.getElementById("profileVenueAddress"),
+    profileVenueLatEl: document.getElementById("profileVenueLat"),
+    profileVenueLngEl: document.getElementById("profileVenueLng"),
     profileVenueNeighborhoodEl: document.getElementById("profileVenueNeighborhood"),
     profileVenueTypeEl: document.getElementById("profileVenueType"),
     profileVenueWebsiteEl: document.getElementById("profileVenueWebsite"),
@@ -248,6 +250,8 @@ function setVenueProfileSelection(venue) {
   ui.profileVenueNameEl.value = venue.name || "";
   ui.profileVenueImageUrlEl.value = venue.imageUrl || "";
   ui.profileVenueAddressEl.value = venue.address || "";
+  ui.profileVenueLatEl.value = venue.lat != null ? venue.lat : "";
+  ui.profileVenueLngEl.value = venue.lng != null ? venue.lng : "";
   ui.profileVenueNeighborhoodEl.value = venue.neighborhood || "";
   ui.profileVenueTypeEl.value = venue.type || "";
   ui.profileVenueWebsiteEl.value = venue.website || "";
@@ -876,13 +880,20 @@ function getProfileFormPayload(venue) {
     description: ui.profileVenueDescriptionEl.value.trim()
   };
 
-  return Object.fromEntries(
+  const payload = Object.fromEntries(
     Object.entries(fields).map(([key, value]) => {
       const normalizedValue = value || null;
       const normalizedSource = source[key] || null;
       return [key, normalizedValue === normalizedSource ? null : normalizedValue];
     })
   );
+
+  const latVal = ui.profileVenueLatEl.value.trim();
+  const lngVal = ui.profileVenueLngEl.value.trim();
+  if (latVal !== "") payload.lat = parseFloat(latVal);
+  if (lngVal !== "") payload.lng = parseFloat(lngVal);
+
+  return payload;
 }
 
 async function saveVenueProfile() {

@@ -400,7 +400,9 @@ app.post("/admin/venues/:id/profile", requireAdminAccess, (req, res) => {
     website: normalizeOptionalText(req.body?.website),
     phone: normalizeOptionalText(req.body?.phone),
     neighborhood: normalizeOptionalText(req.body?.neighborhood),
-    type: normalizeOptionalText(req.body?.type)
+    type: normalizeOptionalText(req.body?.type),
+    lat: parseNullableNumber(req.body?.lat),
+    lng: parseNullableNumber(req.body?.lng)
   });
 
   if (!result.ok) {

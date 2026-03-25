@@ -283,6 +283,7 @@
           <button class="tab-btn active" data-tab="venues">Venues</button>
           <button class="tab-btn" data-tab="offers">Offers</button>
           <button class="tab-btn" data-tab="redemptions">Redemptions</button>
+          <button class="tab-btn" data-tab="members">Members</button>
           <button class="tab-btn" data-tab="sync">Sync</button>
         </nav>
 
@@ -486,6 +487,25 @@
             <span id="redemptionSummary" style="color:var(--muted);font-size:13px;"></span>
           </div>
           <div id="redemptionList" class="offers"></div>
+        </div>
+
+        <!-- MEMBERS TAB -->
+        <div class="tab-content" id="tab-members">
+          <div class="section-header">
+            <h2>Members</h2>
+            <p>All member sign-ups collected through the app.</p>
+          </div>
+          <div class="grid">
+            <div>
+              <label for="memberSearch">Search Members</label>
+              <input id="memberSearch" placeholder="Email, name, or zip code" />
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button id="loadMembersBtn" class="secondary">Refresh Members</button>
+            <span id="memberSummary" style="color:var(--muted);font-size:13px;"></span>
+          </div>
+          <div id="memberList" class="offers"></div>
         </div>
 
         <!-- SYNC TAB -->

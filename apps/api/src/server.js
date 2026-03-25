@@ -12,6 +12,7 @@ import {
   listOffers,
   getVenueOffers,
   listEnabledVenues,
+  listMembers,
   listRedemptions,
   listVenues,
   redeemOffer,
@@ -451,6 +452,10 @@ app.post("/admin/sync/barglance", requireAdminAccess, async (req, res) => {
 
 app.get("/admin/redemptions", requireAdminAccess, (_req, res) => {
   res.json({ ok: true, redemptions: listRedemptions() });
+});
+
+app.get("/admin/members", requireAdminAccess, (_req, res) => {
+  res.json({ ok: true, members: listMembers() });
 });
 
 app.get("/venues/:id", (req, res) => {

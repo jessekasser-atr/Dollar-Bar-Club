@@ -418,6 +418,13 @@ const updateOfferActiveStmt = db.prepare(`
 `);
 
 const listMemberIdsStmt = db.prepare("SELECT id FROM members");
+const listMembersStmt = db.prepare(`
+  SELECT m.id, m.email, m.zip_code, m.first_name, m.last_name, m.created_at,
+         ms.token AS membership_token
+  FROM members m
+  LEFT JOIN memberships ms ON ms.member_id = m.id
+  ORDER BY m.created_at DESC
+`);
 const insertManualVenueStmt = db.prepare(`
   INSERT INTO venues (
     id, source, source_id, enabled, name, city, state, address, neighborhood, type, description, image_url, website, phone, instagram, lat, lng, open_now, price_level, hours_summary, rating, review_count, raw_payload
@@ -1028,9 +1035,22 @@ function deleteVenue(venueId) {
   return deleteVenueTxn(venueId);
 }
 
+function listMembers() {
+  return listMembersStmt.all().map((row) => ({
+    id: row.id,
+    email: row.email,
+    zipCode: row.zip_code,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    membershipToken: row.membership_token,
+    createdAt: row.created_at
+  }));
+}
+
 export {
   claimMembership,
   createOffer,
+  listMembers,
   createVenue,
   DB_PATH,
   deleteOffer,

@@ -21,6 +21,7 @@ let adminAccessKey = localStorage.getItem(ADMIN_STORAGE_KEY) || "";
 let allVenues = [];
 let allAdminOffers = [];
 let allRedemptions = [];
+let allMembers = [];
 let ui = null;
 let selectedProfileVenueId = null;
 
@@ -96,6 +97,10 @@ function renderOpsApp() {
     redemptionSummaryEl: document.getElementById("redemptionSummary"),
     redemptionSearchEl: document.getElementById("redemptionSearch"),
     redemptionFilterEl: document.getElementById("redemptionFilter"),
+    loadMembersBtn: document.getElementById("loadMembersBtn"),
+    memberListEl: document.getElementById("memberList"),
+    memberSummaryEl: document.getElementById("memberSummary"),
+    memberSearchEl: document.getElementById("memberSearch"),
     syncBarglanceBtn: document.getElementById("syncBarglanceBtn"),
     syncStateEl: document.getElementById("syncState"),
     syncCityEl: document.getElementById("syncCity"),
@@ -653,6 +658,59 @@ function renderRedemptionList() {
     `${approvedCount} approved, ${duplicateCount} duplicate replays, ${deniedCount} denied.`;
 }
 
+async function loadMemberList() {
+  try {
+    const data = await jsonFetch("/admin/members");
+    allMembers = data.members.slice();
+    renderMemberList();
+    renderResult(true, { ok: true, memberCount: allMembers.length });
+  } catch (error) {
+    if (String(error.message || error) === "admin_access_required") return;
+    renderResult(false, { ok: false, reason: "load_members_failed", error: String(error) });
+  }
+}
+
+function renderMemberList() {
+  const search = ui.memberSearchEl.value.trim().toLowerCase();
+
+  const filtered = allMembers.filter((member) => {
+    if (!search) return true;
+    const haystack = [
+      member.email,
+      member.firstName,
+      member.lastName,
+      member.zipCode
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(search);
+  });
+
+  ui.memberListEl.innerHTML = "";
+  if (!filtered.length) {
+    ui.memberListEl.textContent = "No members match the current search.";
+  } else {
+    filtered.forEach((member) => ui.memberListEl.appendChild(memberCard(member)));
+  }
+
+  ui.memberSummaryEl.textContent = `${filtered.length} shown of ${allMembers.length} members.`;
+}
+
+function memberCard(member) {
+  const wrap = document.createElement("div");
+  wrap.className = "card";
+  wrap.innerHTML = `
+    <h3>${escapeHtml(member.email)}</h3>
+    <p style="margin-top:6px;color:#5c6675;">
+      <strong>Name:</strong> ${escapeHtml([member.firstName, member.lastName].filter(Boolean).join(" ") || "—")} |
+      <strong>ZIP:</strong> ${escapeHtml(member.zipCode || "—")} |
+      <strong>Signed up:</strong> ${formatDateTime(member.createdAt)}
+    </p>
+  `;
+  return wrap;
+}
+
 function bindEvents() {
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
@@ -667,6 +725,8 @@ function bindEvents() {
   ui.loadRedemptionsBtn.addEventListener("click", loadRedemptionList);
   ui.redemptionSearchEl.addEventListener("input", renderRedemptionList);
   ui.redemptionFilterEl.addEventListener("input", renderRedemptionList);
+  ui.loadMembersBtn.addEventListener("click", loadMemberList);
+  ui.memberSearchEl.addEventListener("input", renderMemberList);
   ui.saveVenueProfileBtn.addEventListener("click", saveVenueProfile);
   ui.clearVenueProfileBtn.addEventListener("click", clearVenueProfileOverrides);
 

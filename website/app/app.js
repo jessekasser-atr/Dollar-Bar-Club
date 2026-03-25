@@ -264,12 +264,6 @@ function chooseVenueOffer(currentOffer, nextOffer) {
     return currentRedeemed ? nextOffer : currentOffer;
   }
 
-  const currentEndsAt = Date.parse(currentOffer.endsAt || 0);
-  const nextEndsAt = Date.parse(nextOffer.endsAt || 0);
-  if (Number.isFinite(currentEndsAt) && Number.isFinite(nextEndsAt) && currentEndsAt !== nextEndsAt) {
-    return nextEndsAt < currentEndsAt ? nextOffer : currentOffer;
-  }
-
   const currentCreatedAt = Date.parse(currentOffer.createdAt || 0);
   const nextCreatedAt = Date.parse(nextOffer.createdAt || 0);
   if (Number.isFinite(currentCreatedAt) && Number.isFinite(nextCreatedAt) && currentCreatedAt !== nextCreatedAt) {
@@ -358,7 +352,7 @@ async function renderVenueList() {
         const aR = a.entitlementStatus === "redeemed" ? 1 : 0;
         const bR = b.entitlementStatus === "redeemed" ? 1 : 0;
         if (aR !== bR) return aR - bR;
-        return Date.parse(b.endsAt || 0) - Date.parse(a.endsAt || 0);
+        return Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0);
       });
       group.primary = group.offers[0];
       group.allRedeemed = group.offers.every((o) => o.entitlementStatus === "redeemed");
@@ -391,7 +385,7 @@ async function renderVenueList() {
         ].filter(Boolean);
         const when = isRedeemed && primary.redeemedAt
           ? `Redeemed ${escapeHtml(formatDateTime(primary.redeemedAt))}`
-          : `Ends ${escapeHtml(formatDateTime(primary.endsAt))}`;
+          : ``;
         const offerLine = extra > 0
           ? `${escapeHtml(primary.title)} <span class="offer-more">+${extra} more</span>`
           : escapeHtml(primary.title);
@@ -589,7 +583,6 @@ async function renderVenueDetail(venueId) {
             <div class="section-kicker">${allOffers.length > 1 ? `Offer ${idx + 1} of ${allOffers.length}` : "Your offer"}</div>
             <div class="detail-offer-title">${escapeHtml(offer.title)}</div>
             <div class="detail-offer-desc">${escapeHtml(offer.description || "One-time pilot offer for active members.")}</div>
-            <div class="detail-window">Valid until ${escapeHtml(formatDateTime(offer.endsAt))}</div>
             ${ctaMarkup}
           </section>
         `;

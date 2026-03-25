@@ -142,10 +142,6 @@ function isAustinZip(zipCode) {
   return AUSTIN_ZIP_RE.test(String(zipCode || "").trim());
 }
 
-function isValidIsoDate(value) {
-  return !Number.isNaN(Date.parse(value));
-}
-
 function parseNullableNumber(value) {
   if (value === null || value === undefined || value === "") {
     return null;
@@ -227,24 +223,14 @@ app.get("/offers/active", (req, res) => {
 });
 
 app.post("/offers", requireAdminAccess, (req, res) => {
-  const { id, venueId, title, description, imageUrl, startsAt, endsAt, isActive } = req.body || {};
+  const { id, venueId, title, description, imageUrl, isActive } = req.body || {};
 
   const normalizedId = String(id || "").trim();
   const normalizedVenueId = String(venueId || "").trim();
   const normalizedTitle = String(title || "").trim();
-  const normalizedStartsAt = String(startsAt || "").trim();
-  const normalizedEndsAt = String(endsAt || "").trim();
 
-  if (!normalizedId || !normalizedVenueId || !normalizedTitle || !normalizedStartsAt || !normalizedEndsAt) {
+  if (!normalizedId || !normalizedVenueId || !normalizedTitle) {
     return res.status(400).json({ ok: false, reason: "offer_fields_required" });
-  }
-
-  if (!isValidIsoDate(normalizedStartsAt) || !isValidIsoDate(normalizedEndsAt)) {
-    return res.status(400).json({ ok: false, reason: "invalid_offer_window" });
-  }
-
-  if (normalizedStartsAt >= normalizedEndsAt) {
-    return res.status(400).json({ ok: false, reason: "invalid_offer_window" });
   }
 
   const result = createOffer({
@@ -253,8 +239,8 @@ app.post("/offers", requireAdminAccess, (req, res) => {
     title: normalizedTitle,
     description: description ? String(description).trim() : null,
     imageUrl: imageUrl ? String(imageUrl).trim() : null,
-    startsAt: new Date(normalizedStartsAt).toISOString(),
-    endsAt: new Date(normalizedEndsAt).toISOString(),
+    startsAt: "2000-01-01T00:00:00.000Z",
+    endsAt: "2099-12-31T23:59:59.000Z",
     isActive: isActive !== false
   });
 

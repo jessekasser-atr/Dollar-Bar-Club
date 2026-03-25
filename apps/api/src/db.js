@@ -322,11 +322,9 @@ const listActiveOffersStmt = db.prepare(`
   FROM offers o
   JOIN venues v ON v.id = o.venue_id
   WHERE o.is_active = 1
-    AND o.starts_at <= @nowIso
-    AND o.ends_at >= @nowIso
     AND (@venueId IS NULL OR o.venue_id = @venueId)
     AND (@enabledOnly = 0 OR v.enabled = 1)
-  ORDER BY o.starts_at ASC, o.id ASC
+  ORDER BY o.created_at ASC, o.id ASC
 `);
 
 const findVenueByIdStmt = db.prepare(`
@@ -379,9 +377,7 @@ const listVenueActiveOffersStmt = db.prepare(`
   FROM offers
   WHERE venue_id = ?
     AND is_active = 1
-    AND starts_at <= ?
-    AND ends_at >= ?
-  ORDER BY starts_at ASC, id ASC
+  ORDER BY created_at ASC, id ASC
 `);
 
 const listOffersStmt = db.prepare(`
@@ -687,7 +683,7 @@ function getVenueOffers(venueId, membershipToken = null) {
   }
 
   const offers = listVenueActiveOffersStmt
-    .all(venueId, nowIso(), nowIso())
+    .all(venueId)
     .map((row) => mapOffer(row));
 
   if (!membershipToken) {
@@ -757,8 +753,7 @@ const redeemTxn = db.transaction(({ membershipToken, offerId, venueId, staffId, 
     return { ok: false, statusCode: 400, reason: "venue_mismatch" };
   }
 
-  const currentIso = nowIso();
-  if (!offer.isActive || currentIso < offer.startsAt || currentIso > offer.endsAt) {
+  if (!offer.isActive) {
     logRedemptionEvent({
       memberId: membership.memberId,
       membershipToken,

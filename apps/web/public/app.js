@@ -112,8 +112,6 @@ function renderOpsApp() {
     newOfferVenueIdEl: document.getElementById("newOfferVenueId"),
     newOfferTitleEl: document.getElementById("newOfferTitle"),
     newOfferImageUrlEl: document.getElementById("newOfferImageUrl"),
-    newOfferStartsAtEl: document.getElementById("newOfferStartsAt"),
-    newOfferEndsAtEl: document.getElementById("newOfferEndsAt"),
     newOfferDescriptionEl: document.getElementById("newOfferDescription"),
     selectedVenueSummaryEl: document.getElementById("selectedVenueSummary"),
     offerCreateStatusEl: document.getElementById("offerCreateStatus"),
@@ -136,7 +134,6 @@ function renderOpsApp() {
     manualVenueNeighborhoodEl: document.getElementById("manualVenueNeighborhood")
   };
 
-  resetOfferDateFields();
   bindEvents();
 }
 
@@ -202,23 +199,6 @@ async function jsonFetch(path, init = {}) {
     throw new Error(JSON.stringify(payload));
   }
   return payload;
-}
-
-function toDateTimeLocalValue(value) {
-  const date = value ? new Date(value) : new Date();
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  const pad = (part) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function resetOfferDateFields() {
-  ui.newOfferStartsAtEl.value = toDateTimeLocalValue(new Date());
-  const end = new Date();
-  end.setMonth(end.getMonth() + 1);
-  ui.newOfferEndsAtEl.value = toDateTimeLocalValue(end);
 }
 
 function renderResult(ok, payload) {
@@ -407,9 +387,6 @@ function offerAdminCard(offer) {
       <strong>Offer ID:</strong> ${escapeHtml(offer.id)} |
       <strong>Venue:</strong> ${escapeHtml(offer.venueName || offer.venueId)} |
       <strong>Status:</strong> ${offer.isActive ? "active" : "inactive"}
-    </p>
-    <p style="margin-top:6px;color:#5c6675;">
-      <strong>Window:</strong> ${formatDateTime(offer.startsAt)} to ${formatDateTime(offer.endsAt)}
     </p>
   `;
 
@@ -775,10 +752,8 @@ function bindEvents() {
     const title = ui.newOfferTitleEl.value.trim();
     const description = ui.newOfferDescriptionEl.value.trim();
     const imageUrl = ui.newOfferImageUrlEl.value.trim();
-    const startsAt = ui.newOfferStartsAtEl.value.trim();
-    const endsAt = ui.newOfferEndsAtEl.value.trim();
 
-    if (!id || !venueId || !title || !startsAt || !endsAt) {
+    if (!id || !venueId || !title) {
       renderResult(false, { ok: false, reason: "offer_fields_required" });
       return;
     }
@@ -797,16 +772,13 @@ function bindEvents() {
           venueId,
           title,
           description: description || undefined,
-          imageUrl: imageUrl || undefined,
-          startsAt: new Date(startsAt).toISOString(),
-          endsAt: new Date(endsAt).toISOString()
+          imageUrl: imageUrl || undefined
         })
       });
 
       ui.newOfferTitleEl.value = "";
       ui.newOfferImageUrlEl.value = "";
       ui.newOfferDescriptionEl.value = "";
-      resetOfferDateFields();
       ui.offerCreateStatusEl.style.color = "#107c41";
       ui.offerCreateStatusEl.textContent = `Created: ${data.offer.title} for ${data.offer.venueId}.`;
       await loadAdminOffers();

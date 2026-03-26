@@ -110,6 +110,8 @@
         font-size: 14px;
         padding: 12px 18px;
         cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
       }
 
       .nav-btn:hover,
@@ -370,9 +372,7 @@
         <div class="logo">Dollar Bar Club</div>
         <div class="nav-links">
           <a class="nav-link" href="mailto:dollarbarclub@gmail.com">Contact</a>
-          <button class="nav-btn" type="button" onclick="document.getElementById('claim').scrollIntoView({ behavior: 'smooth' })">
-            Join the Waitlist
-          </button>
+          <a class="nav-btn" href="/app">Sign In</a>
         </div>
       </div>
     </nav>
@@ -380,15 +380,13 @@
     <main class="wrap">
       <section class="hero">
         <div>
-          <span class="badge">Invite-Only - Austin, TX</span>
+          <span class="badge">Members Only - Austin, TX</span>
           <h1>Get Drink Specials That Aren't On The Menu</h1>
           <p>
             Access exclusive, venue-hosted specials and neighborhood perks at hand-selected Austin bars.
           </p>
           <div class="hero-cta">
-            <button class="primary-btn" type="button" onclick="document.getElementById('claim').scrollIntoView({ behavior: 'smooth' })">
-              Join the Waitlist
-            </button>
+            <a class="primary-btn" href="/app">Sign Up Free</a>
             <span class="muted">Verified via Austin zip code - 100% free for locals</span>
           </div>
         </div>
@@ -440,19 +438,11 @@
       <div class="section-band section-band--elevated">
         <section class="section" id="claim">
           <h2>Ready to get started?</h2>
-          <p class="section-lead">Join Austin locals already waiting for launch access.</p>
-          <p class="section-lead" style="opacity: 0.85; margin-top: 6px;">
-            Live waitlist: <span id="waitlistCount">...</span>
-          </p>
-          <form id="membershipForm" class="form-box">
-            <input id="fullName" type="text" placeholder="Name" aria-label="Name" />
-            <input id="email" type="email" placeholder="Email" aria-label="Email" />
-            <input id="phone" type="tel" placeholder="Phone (for early access alerts)" aria-label="Phone" />
-            <input id="zip" type="text" placeholder="Austin Zip Code" aria-label="Austin zip code" />
-            <button class="primary-btn" type="submit">Get My Free Membership</button>
-          </form>
-
-          <p id="formMessage" style="margin-top: 12px;"></p>
+          <p class="section-lead">Join Austin locals already enjoying member-only drink specials.</p>
+          <div style="margin-top: 24px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+            <a class="primary-btn" href="/app">Sign Up Free</a>
+            <a class="primary-btn" href="/app" style="background: transparent; border: 2px solid #35d06f; color: #35d06f;">Sign In</a>
+          </div>
         </section>
       </div>
 
@@ -477,7 +467,7 @@
             <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 1.17.054 1.97.24 2.43.403a4.088 4.088 0 011.523.99 4.088 4.088 0 01.99 1.524c.163.46.35 1.26.403 2.43.058 1.265.07 1.645.07 4.849s-.012 3.584-.07 4.85c-.054 1.17-.24 1.97-.403 2.43a4.088 4.088 0 01-.99 1.523 4.088 4.088 0 01-1.524.99c-.46.163-1.26.35-2.43.403-1.265.058-1.645.07-4.849.07s-3.584-.012-4.85-.07c-1.17-.054-1.97-.24-2.43-.403a4.088 4.088 0 01-1.523-.99 4.088 4.088 0 01-.99-1.524c-.163-.46-.35-1.26-.403-2.43C2.175 15.747 2.163 15.367 2.163 12s.012-3.584.07-4.85c.054-1.17.24-1.97.403-2.43a4.088 4.088 0 01.99-1.523A4.088 4.088 0 015.15 2.206c.46-.163 1.26-.35 2.43-.403C8.845 2.175 9.225 2.163 12 2.163zm0-2.163C8.741 0 8.333.014 7.053.072 5.775.13 4.902.333 4.14.63a6.21 6.21 0 00-2.245 1.462A6.21 6.21 0 00.433 4.337C.136 5.1-.067 5.973.01 7.25.068 8.53.082 8.938.082 12.197c0 3.259.014 3.668.072 4.948.058 1.277.261 2.15.558 2.913a6.21 6.21 0 001.462 2.245 6.21 6.21 0 002.245 1.462c.763.297 1.636.5 2.913.558C8.333 23.986 8.741 24 12 24s3.668-.014 4.948-.072c1.277-.058 2.15-.261 2.913-.558a6.21 6.21 0 002.245-1.462 6.21 6.21 0 001.462-2.245c.297-.763.5-1.636.558-2.913.058-1.28.072-1.689.072-4.948s-.014-3.668-.072-4.948c-.058-1.277-.261-2.15-.558-2.913a6.21 6.21 0 00-1.462-2.245A6.21 6.21 0 0019.861.433C19.1.136 18.227-.067 16.95.01 15.67.068 15.262.082 12.003.082zM12 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 11-2.88 0 1.44 1.44 0 012.88 0z"/></svg>
           </a>
         </div>
-        Austin, Texas - Invite-only locals program - Contact:
+        Austin, Texas - Members-only locals program - Contact:
         <a href="mailto:dollarbarclub@gmail.com">dollarbarclub@gmail.com</a>
         <p class="disclaimer">
           Dollar Bar Club is a membership platform connecting users with participating venues. All alcohol pricing,
@@ -489,33 +479,9 @@
 
     <script>
       window.addEventListener("DOMContentLoaded", () => {
-        const form = document.getElementById("membershipForm");
-        const msg = document.getElementById("formMessage");
-        const waitlistCountEl = document.getElementById("waitlistCount");
         const barForm = document.getElementById("barSignupForm");
         const barMsg = document.getElementById("barFormMessage");
         const barBtn = document.getElementById("barSubmitBtn");
-
-        function setMessage(text, isError = false) {
-          if (!msg) return;
-          msg.textContent = text;
-          msg.style.color = isError ? "#ff4b4b" : "#35d06f";
-        }
-
-        async function refreshWaitlistCount() {
-          if (!waitlistCountEl) return;
-
-          try {
-            const response = await fetch("/api/stats");
-            const data = await response.json();
-
-            if (response.ok && typeof data.waitlistCount === "number") {
-              waitlistCountEl.textContent = data.waitlistCount.toLocaleString();
-            }
-          } catch (error) {
-            // Ignore count refresh failures on the marketing page.
-          }
-        }
 
         if (barForm) {
           barForm.addEventListener("submit", async (event) => {
@@ -571,49 +537,6 @@
           });
         }
 
-        refreshWaitlistCount();
-        if (!form) return;
-
-        const fullNameEl = document.getElementById("fullName");
-        const emailEl = document.getElementById("email");
-        const phoneEl = document.getElementById("phone");
-        const zipEl = document.getElementById("zip");
-
-        form.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          setMessage("Submitting...");
-
-          const fullName = (fullNameEl?.value || "").trim();
-          const email = (emailEl?.value || "").trim();
-          const phone = (phoneEl?.value || "").trim();
-          const zip = (zipEl?.value || "").trim();
-
-          if (!email || !zip) {
-            setMessage("Please enter email + Austin zip code.", true);
-            return;
-          }
-
-          try {
-            const response = await fetch("/api/signup", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ fullName, email, phone, zip }),
-            });
-
-            const data = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-              setMessage(data.error || "Signup failed. Try again.", true);
-              return;
-            }
-
-            setMessage("You're on the list!");
-            form.reset();
-            refreshWaitlistCount();
-          } catch (error) {
-            setMessage("Network error. Please try again.", true);
-          }
-        });
       });
     </script>
   </body>

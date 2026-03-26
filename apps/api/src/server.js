@@ -13,6 +13,7 @@ import {
   getVenueOffers,
   listEnabledVenues,
   listMembers,
+  loginByEmail,
   listRedemptions,
   listVenues,
   redeemOffer,
@@ -205,6 +206,28 @@ app.post("/memberships/claim", claimRateLimiter, (req, res) => {
     memberId: claimed.memberId,
     membershipToken: claimed.membership.token,
     zipCode: claimed.membership.zipCode
+  });
+});
+
+app.post("/memberships/login", claimRateLimiter, (req, res) => {
+  const { email } = req.body || {};
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    return res.status(400).json({ ok: false, reason: "email_required" });
+  }
+
+  const result = loginByEmail(normalizedEmail);
+
+  if (!result.ok) {
+    return res.status(result.statusCode).json({ ok: false, reason: result.reason });
+  }
+
+  return res.json({
+    ok: true,
+    memberId: result.memberId,
+    membershipToken: result.membershipToken,
+    zipCode: result.zipCode
   });
 });
 

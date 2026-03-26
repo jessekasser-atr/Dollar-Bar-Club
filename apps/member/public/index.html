@@ -211,6 +211,32 @@
       border: 1px solid rgba(255, 255, 255, 0.14);
     }
 
+    .auth-toggle {
+      display: flex;
+      gap: 0;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .auth-toggle-btn {
+      flex: 1;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      background: transparent;
+      color: var(--muted);
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .auth-toggle-btn.active {
+      background: var(--accent);
+      color: #041006;
+    }
+
     .trust-chip {
       padding: 6px 12px;
       background: rgba(53, 208, 111, 0.12);

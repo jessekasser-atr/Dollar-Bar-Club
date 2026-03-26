@@ -1035,6 +1035,23 @@ const deleteVenueTxn = db.transaction((venueId) => {
   return { ok: true, deletedVenueId: venueId, deletedOffers: offerIds.length };
 });
 
+function loginByEmail(email) {
+  const member = findMemberByEmailStmt.get(email);
+  if (!member) {
+    return { ok: false, statusCode: 404, reason: "member_not_found" };
+  }
+  const membership = findMembershipByMemberIdStmt.get(member.id);
+  if (!membership) {
+    return { ok: false, statusCode: 404, reason: "membership_not_found" };
+  }
+  return {
+    ok: true,
+    memberId: member.id,
+    membershipToken: membership.token,
+    zipCode: membership.zip_code
+  };
+}
+
 function deleteVenue(venueId) {
   return deleteVenueTxn(venueId);
 }
@@ -1055,6 +1072,7 @@ export {
   claimMembership,
   createOffer,
   listMembers,
+  loginByEmail,
   createVenue,
   DB_PATH,
   deleteOffer,

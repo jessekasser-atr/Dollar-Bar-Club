@@ -160,29 +160,47 @@ function renderOnboarding() {
           <p class="welcome-copy">
             Unlock member offers at a curated set of Austin bars.
           </p>
-          <p class="welcome-copy welcome-copy-tight">
-            Already joined? Use the same email and ZIP code to reopen your pass.
-          </p>
         </section>
 
         <section class="panel panel-onboarding">
-          <div class="section-kicker">Claim membership</div>
-          <h3 class="panel-title">Get your digital pass</h3>
-          <p class="panel-copy">
-            Austin locals only. Enter your email and ZIP code to continue.
-          </p>
-          <form id="claim-form" class="form-stack">
-            <div class="form-group">
-              <label for="email">Email</label>
-              <input type="email" id="email" placeholder="you@domain.com" required autocomplete="email">
-            </div>
-            <div class="form-group">
-              <label for="zip">Austin ZIP code</label>
-              <input type="text" id="zip" placeholder="78701" required inputmode="numeric" maxlength="5" autocomplete="postal-code">
-            </div>
-            <button type="submit" class="btn btn-primary" id="claim-btn">Claim membership</button>
-            <div id="claim-error" class="form-error"></div>
-          </form>
+          <div class="auth-toggle">
+            <button class="auth-toggle-btn active" id="toggle-signup">Sign Up</button>
+            <button class="auth-toggle-btn" id="toggle-signin">Sign In</button>
+          </div>
+
+          <div id="signup-panel">
+            <h3 class="panel-title">Create your free membership</h3>
+            <p class="panel-copy">
+              Austin locals only. Enter your email and ZIP code to get started.
+            </p>
+            <form id="claim-form" class="form-stack">
+              <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="you@domain.com" required autocomplete="email">
+              </div>
+              <div class="form-group">
+                <label for="zip">Austin ZIP code</label>
+                <input type="text" id="zip" placeholder="78701" required inputmode="numeric" maxlength="5" autocomplete="postal-code">
+              </div>
+              <button type="submit" class="btn btn-primary" id="claim-btn">Sign Up</button>
+              <div id="claim-error" class="form-error"></div>
+            </form>
+          </div>
+
+          <div id="signin-panel" style="display:none;">
+            <h3 class="panel-title">Welcome back</h3>
+            <p class="panel-copy">
+              Enter the email you signed up with to access your pass.
+            </p>
+            <form id="login-form" class="form-stack">
+              <div class="form-group">
+                <label for="login-email">Email</label>
+                <input type="email" id="login-email" placeholder="you@domain.com" required autocomplete="email">
+              </div>
+              <button type="submit" class="btn btn-primary" id="login-btn">Sign In</button>
+              <div id="login-error" class="form-error"></div>
+            </form>
+          </div>
         </section>
       `,
       { hideHero: true }
@@ -190,6 +208,21 @@ function renderOnboarding() {
   );
 
   document.getElementById("claim-form").addEventListener("submit", handleClaim);
+  document.getElementById("login-form").addEventListener("submit", handleLogin);
+
+  document.getElementById("toggle-signup").addEventListener("click", () => {
+    document.getElementById("signup-panel").style.display = "";
+    document.getElementById("signin-panel").style.display = "none";
+    document.getElementById("toggle-signup").classList.add("active");
+    document.getElementById("toggle-signin").classList.remove("active");
+  });
+
+  document.getElementById("toggle-signin").addEventListener("click", () => {
+    document.getElementById("signup-panel").style.display = "none";
+    document.getElementById("signin-panel").style.display = "";
+    document.getElementById("toggle-signin").classList.add("active");
+    document.getElementById("toggle-signup").classList.remove("active");
+  });
 }
 
 async function handleClaim(event) {
@@ -207,7 +240,7 @@ async function handleClaim(event) {
   }
 
   button.disabled = true;
-  button.textContent = "Claiming...";
+  button.textContent = "Signing up...";
 
   try {
     const data = await api("POST", "/memberships/claim", { email, zipCode });
@@ -221,10 +254,43 @@ async function handleClaim(event) {
     } else if (reason === "non_austin_zip") {
       errorEl.textContent = "This pilot is currently limited to Austin-area members.";
     } else {
-      errorEl.textContent = "We could not claim your membership. Please try again.";
+      errorEl.textContent = "Something went wrong. Please try again.";
     }
     button.disabled = false;
-    button.textContent = "Claim membership";
+    button.textContent = "Sign Up";
+  }
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+
+  const email = document.getElementById("login-email").value.trim();
+  const button = document.getElementById("login-btn");
+  const errorEl = document.getElementById("login-error");
+
+  errorEl.textContent = "";
+
+  if (!email) {
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Signing in...";
+
+  try {
+    const data = await api("POST", "/memberships/login", { email });
+    setToken(data.membershipToken);
+    navigate("#/");
+    renderVenueList();
+  } catch (error) {
+    const reason = error.data?.reason;
+    if (reason === "member_not_found" || reason === "membership_not_found") {
+      errorEl.textContent = "We couldn't find an account with that email. Try signing up instead.";
+    } else {
+      errorEl.textContent = "Something went wrong. Please try again.";
+    }
+    button.disabled = false;
+    button.textContent = "Sign In";
   }
 }
 

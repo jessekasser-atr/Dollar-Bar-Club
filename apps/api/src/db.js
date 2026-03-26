@@ -814,6 +814,7 @@ const redeemTxn = db.transaction(({ membershipToken, offerId, venueId, staffId, 
     };
   }
 
+  const currentIso = nowIso();
   markEntitlementRedeemedStmt.run(currentIso, entitlement.id);
 
   logRedemptionEvent({

@@ -325,23 +325,28 @@ app.post("/redeem", redeemRateLimiter, (req, res) => {
     return res.status(400).json({ ok: false, reason: "membership_offer_venue_required" });
   }
 
-  const result = redeemOffer({
-    membershipToken: String(membershipToken),
-    offerId: String(offerId),
-    venueId: String(venueId),
-    staffId: staffId ? String(staffId) : null,
-    deviceId: deviceId ? String(deviceId) : null
-  });
-
-  if (!result.ok) {
-    return res.status(result.statusCode).json({
-      ok: false,
-      reason: result.reason,
-      ...(result.redeemedAt ? { redeemedAt: result.redeemedAt } : {})
+  try {
+    const result = redeemOffer({
+      membershipToken: String(membershipToken),
+      offerId: String(offerId),
+      venueId: String(venueId),
+      staffId: staffId ? String(staffId) : null,
+      deviceId: deviceId ? String(deviceId) : null
     });
-  }
 
-  return res.json(result);
+    if (!result.ok) {
+      return res.status(result.statusCode).json({
+        ok: false,
+        reason: result.reason,
+        ...(result.redeemedAt ? { redeemedAt: result.redeemedAt } : {})
+      });
+    }
+
+    return res.json(result);
+  } catch (err) {
+    console.error("Redeem error:", err);
+    return res.status(500).json({ ok: false, reason: "internal_error" });
+  }
 });
 
 app.get("/admin/venues", requireAdminAccess, (_req, res) => {

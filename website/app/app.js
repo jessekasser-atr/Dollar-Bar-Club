@@ -582,7 +582,7 @@ async function renderVenueDetail(venueId) {
           <section class="panel">
             <div class="section-kicker">${allOffers.length > 1 ? `Offer ${idx + 1} of ${allOffers.length}` : "Your offer"}</div>
             <div class="detail-offer-title">${escapeHtml(offer.title)}</div>
-            <div class="detail-offer-desc">${escapeHtml(offer.description || "One-time pilot offer for active members.")}</div>
+            ${offer.description ? `<div class="detail-offer-desc">${escapeHtml(offer.description)}</div>` : `<div class="detail-offer-desc">&nbsp;</div>`}
             ${ctaMarkup}
           </section>
         `;

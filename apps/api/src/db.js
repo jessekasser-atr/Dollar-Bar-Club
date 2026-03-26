@@ -1035,7 +1035,7 @@ const deleteVenueTxn = db.transaction((venueId) => {
   return { ok: true, deletedVenueId: venueId, deletedOffers: offerIds.length };
 });
 
-function loginByEmail(email) {
+const loginByEmailTxn = db.transaction((email) => {
   const member = findMemberByEmailStmt.get(email);
   if (!member) {
     return { ok: false, statusCode: 404, reason: "member_not_found" };
@@ -1044,12 +1044,30 @@ function loginByEmail(email) {
   if (!membership) {
     return { ok: false, statusCode: 404, reason: "membership_not_found" };
   }
+
+  for (const offer of listOfferIdsStmt.all()) {
+    const existing = findEntitlementStmt.get(member.id, offer.id);
+    if (!existing) {
+      insertEntitlementStmt.run(
+        createId("ent"),
+        member.id,
+        offer.id,
+        createEntitlementToken(),
+        nowIso()
+      );
+    }
+  }
+
   return {
     ok: true,
     memberId: member.id,
     membershipToken: membership.token,
     zipCode: membership.zip_code
   };
+});
+
+function loginByEmail(email) {
+  return loginByEmailTxn(email);
 }
 
 function deleteVenue(venueId) {

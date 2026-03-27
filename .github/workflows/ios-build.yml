@@ -132,6 +132,7 @@ jobs:
       - name: Build archive
         working-directory: apps/member/ios/App
         run: |
+          set -eo pipefail
           xcodebuild archive \
             ${{ env.BUILD_TARGET }} \
             -scheme App \
@@ -144,11 +145,14 @@ jobs:
             PRODUCT_BUNDLE_IDENTIFIER=com.barglance.dollarbarclub \
             MARKETING_VERSION="${{ env.APP_VERSION }}" \
             CURRENT_PROJECT_VERSION="${{ env.APP_BUILD }}" \
-            | xcpretty
+            2>&1 | tee $RUNNER_TEMP/build.log | tail -50
+          echo "--- Archive contents ---"
+          ls -la $RUNNER_TEMP/App.xcarchive/Products/Applications/ || echo "No archive products found"
 
       - name: Export IPA
         run: |
-          cat > $RUNNER_TEMP/ExportOptions.plist << 'PLIST'
+          set -eo pipefail
+          cat > $RUNNER_TEMP/ExportOptions.plist << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -166,13 +170,15 @@ jobs:
             </dict>
           </dict>
           </plist>
-          PLIST
+          EOF
 
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/App.xcarchive \
             -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
             -exportPath $RUNNER_TEMP/export \
-            | xcpretty
+            2>&1 | tee $RUNNER_TEMP/export.log | tail -30
+          echo "--- Export contents ---"
+          ls -la $RUNNER_TEMP/export/ || echo "Export directory not found"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4

@@ -7,7 +7,7 @@
   <title>Dollar Bar Club</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/icons/icon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
   <style>
     *,
     *::before,
@@ -48,6 +48,14 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    html.native body {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      overscroll-behavior-y: none;
+    }
+
     #app {
       max-width: 480px;
       margin: 0 auto;
@@ -73,6 +81,7 @@
       width: 100%;
       text-align: center;
       padding: 10px 0;
+      padding-top: calc(10px + env(safe-area-inset-top));
       background: rgba(255, 255, 255, 0.04);
       border-bottom: 1px solid var(--border);
       font-size: 12px;
@@ -176,7 +185,7 @@
     .main {
       flex: 1;
       padding-top: 4px;
-      padding-bottom: 24px;
+      padding-bottom: calc(24px + env(safe-area-inset-bottom));
     }
 
     .main-no-hero {
@@ -924,6 +933,12 @@
       padding: 52px 0;
       color: var(--muted);
       font-size: 14px;
+    }
+
+    html.native input,
+    html.native textarea {
+      -webkit-user-select: text;
+      user-select: text;
     }
 
     @media (max-width: 420px) {

@@ -72,11 +72,20 @@ jobs:
             echo "No Podfile found — using Swift Package Manager (Capacitor 6+)"
           fi
 
+      - name: Detect Xcode project type
+        working-directory: apps/member/ios/App
+        run: |
+          if [ -d App.xcworkspace ]; then
+            echo "BUILD_TARGET=-workspace App.xcworkspace" >> "$GITHUB_ENV"
+          else
+            echo "BUILD_TARGET=-project App.xcodeproj" >> "$GITHUB_ENV"
+          fi
+
       - name: Resolve Swift packages
         working-directory: apps/member/ios/App
         run: |
           xcodebuild -resolvePackageDependencies \
-            -workspace App.xcworkspace \
+            ${{ env.BUILD_TARGET }} \
             -scheme App
 
       - name: Import signing certificate
@@ -124,7 +133,7 @@ jobs:
         working-directory: apps/member/ios/App
         run: |
           xcodebuild archive \
-            -workspace App.xcworkspace \
+            ${{ env.BUILD_TARGET }} \
             -scheme App \
             -configuration Release \
             -archivePath $RUNNER_TEMP/App.xcarchive \

@@ -11,3 +11,6 @@ data/dbc.sqlite-shm
 
 # Capacitor iOS native project (generated on macOS CI, not checked in)
 apps/member/ios/
+
+# Signing credentials — never commit
+certs/

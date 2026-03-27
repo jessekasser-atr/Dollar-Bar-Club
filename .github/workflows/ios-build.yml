@@ -63,9 +63,21 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string 'Dollar Bar Club needs your location to verify you are at the venue when redeeming your drink offer.'" Info.plist 2>/dev/null \
             || /usr/libexec/PlistBuddy -c "Set :NSLocationWhenInUseUsageDescription 'Dollar Bar Club needs your location to verify you are at the venue when redeeming your drink offer.'" Info.plist
 
-      - name: Install CocoaPods
+      - name: Install CocoaPods (if needed)
         working-directory: apps/member/ios/App
-        run: pod install
+        run: |
+          if [ -f Podfile ]; then
+            pod install
+          else
+            echo "No Podfile found — using Swift Package Manager (Capacitor 6+)"
+          fi
+
+      - name: Resolve Swift packages
+        working-directory: apps/member/ios/App
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -workspace App.xcworkspace \
+            -scheme App
 
       - name: Import signing certificate
         env:

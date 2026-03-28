@@ -149,9 +149,13 @@ jobs:
             PRODUCT_BUNDLE_IDENTIFIER=com.barglance.dollarbarclub \
             MARKETING_VERSION="${{ env.APP_VERSION }}" \
             CURRENT_PROJECT_VERSION="${{ env.APP_BUILD }}" \
-            2>&1 | tee $RUNNER_TEMP/build.log | tail -50
+            2>&1 | tee $RUNNER_TEMP/build.log
           echo "--- Archive contents ---"
           ls -la $RUNNER_TEMP/App.xcarchive/Products/Applications/ || echo "No archive products found"
+
+      - name: Show build errors (if failed)
+        if: failure()
+        run: grep -iE '(error:|fatal error|failed)' $RUNNER_TEMP/build.log | head -40 || echo "No error lines found"
 
       - name: Export IPA
         run: |

@@ -209,9 +209,9 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>app-store-connect</string>
-            <key>destination</key>
-            <string>upload</string>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>2V4X7M6A4G</string>
             <key>signingStyle</key>
             <string>manual</string>
             <key>provisioningProfiles</key>

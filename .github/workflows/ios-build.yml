@@ -88,6 +88,9 @@ jobs:
             ${{ env.BUILD_TARGET }} \
             -scheme App
 
+      - name: Install iOS platform
+        run: xcodebuild -downloadPlatform iOS
+
       - name: Import signing certificate
         env:
           P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
@@ -138,7 +141,7 @@ jobs:
             -scheme App \
             -configuration Release \
             -archivePath $RUNNER_TEMP/App.xcarchive \
-            -destination 'generic/platform=iOS' \
+            -sdk iphoneos \
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE_SPECIFIER="${{ env.PROVISION_UUID }}" \
             CODE_SIGN_IDENTITY="Apple Distribution" \

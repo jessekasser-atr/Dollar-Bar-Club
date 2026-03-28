@@ -143,6 +143,7 @@ jobs:
             -archivePath $RUNNER_TEMP/App.xcarchive \
             -sdk iphoneos \
             CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=2V4X7M6A4G \
             PROVISIONING_PROFILE_SPECIFIER="${{ env.PROVISION_UUID }}" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PRODUCT_BUNDLE_IDENTIFIER=com.barglance.dollarbarclub \

@@ -130,7 +130,9 @@ jobs:
             -scheme App
 
       - name: Install iOS platform
-        run: xcodebuild -downloadPlatform iOS
+        run: |
+          xcodebuild -downloadPlatform iOS || echo "Download skipped — SDK may already be installed"
+          xcodebuild -showsdks | grep iphoneos
 
       - name: Import signing certificate
         env:

@@ -240,19 +240,18 @@ jobs:
       - name: Upload to App Store Connect
         if: inputs.upload_to_appstore
         env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
-          KEY_PATH=$RUNNER_TEMP/asc_key.p8
-          echo "$APP_STORE_CONNECT_API_KEY" > "$KEY_PATH"
+          mkdir -p ~/.private_keys
+          echo "$ASC_PRIVATE_KEY" > ~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
 
           xcrun altool --upload-app \
             -f $RUNNER_TEMP/export/*.ipa \
             -t ios \
-            --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
-            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
-            --apiKeyPath "$KEY_PATH"
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
 
       - name: Cleanup keychain
         if: always()

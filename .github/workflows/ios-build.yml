@@ -245,7 +245,12 @@ jobs:
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.private_keys
-          echo "$ASC_PRIVATE_KEY" > ~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
+          KEY_FILE=~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
+          printf '%s\n' "$ASC_PRIVATE_KEY" > "$KEY_FILE"
+
+          echo "--- Key file check ---"
+          head -1 "$KEY_FILE"
+          wc -l "$KEY_FILE"
 
           xcrun altool --upload-app \
             -f $RUNNER_TEMP/export/*.ipa \

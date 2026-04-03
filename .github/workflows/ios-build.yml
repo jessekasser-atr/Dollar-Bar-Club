@@ -45,6 +45,32 @@ jobs:
         working-directory: apps/member
         run: npx cap sync ios
 
+      - name: Generate app icon PNGs
+        run: |
+          pip3 install Pillow
+          python3 scripts/generate_icons.py
+
+      - name: Install app icon in Xcode asset catalog
+        run: |
+          ICON_SET=apps/member/ios/App/App/Assets.xcassets/AppIcon.appiconset
+          cp apps/member/public/icons/icon-1024.png "$ICON_SET/AppIcon-1024.png"
+          cat > "$ICON_SET/Contents.json" << 'JSON'
+          {
+            "images": [
+              {
+                "filename": "AppIcon-1024.png",
+                "idiom": "universal",
+                "platform": "ios",
+                "size": "1024x1024"
+              }
+            ],
+            "info": {
+              "author": "xcode",
+              "version": 1
+            }
+          }
+          JSON
+
       - name: Patch AppDelegate for Capacitor 8 + Xcode 16 compatibility
         working-directory: apps/member/ios/App/App
         run: |
@@ -246,7 +272,12 @@ jobs:
         run: |
           mkdir -p ~/.private_keys
           KEY_FILE=~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
-          printf '%s\n' "$ASC_PRIVATE_KEY" > "$KEY_FILE"
+          if printf '%s' "$ASC_PRIVATE_KEY" | grep -q '\\n'; then
+            printf '%b' "$ASC_PRIVATE_KEY" > "$KEY_FILE"
+          else
+            printf '%s\n' "$ASC_PRIVATE_KEY" > "$KEY_FILE"
+          fi
+          chmod 600 "$KEY_FILE"
 
           echo "--- Key file check ---"
           head -1 "$KEY_FILE"

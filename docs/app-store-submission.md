@@ -1,6 +1,6 @@
 # Dollar Bar Club — iOS App Store Submission Guide
 
-> Status: **In Progress** | Target: Apple App Store via Capacitor wrapper
+> Status: **Build pipeline verified on March 31, 2026** | Target: Apple App Store via Capacitor wrapper
 
 ---
 
@@ -39,6 +39,7 @@ via `window.Capacitor.isNativePlatform()`).
 - [x] `apple-touch-icon` meta tag points to 180×180 PNG
 - [x] Privacy policy page at `website/privacy.html`
 - [x] Icon generation script at `scripts/generate_icons.py`
+- [x] GitHub Actions workflow builds, signs, exports, and uploads successfully to App Store Connect
 
 ---
 

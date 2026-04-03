@@ -3,6 +3,15 @@ function resolveApiBase() {
     return String(window.__DBC_API_BASE__).replace(/\/+$/, "");
   }
 
+  const isCapacitor =
+    typeof window !== "undefined" &&
+    window.Capacitor &&
+    window.Capacitor.isNativePlatform();
+
+  if (isCapacitor) {
+    return "https://dbc-api.onrender.com";
+  }
+
   const { protocol, hostname } = window.location;
   const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
   if (isLocalhost) {
@@ -925,6 +934,10 @@ window.addEventListener("hashchange", onRouteChange);
     lastScrollY = currentScrollY;
   }, { passive: true });
 })();
+
+if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+  document.documentElement.classList.add("native");
+}
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

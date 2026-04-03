@@ -419,6 +419,12 @@ const updateOfferActiveStmt = db.prepare(`
   WHERE id = ?
 `);
 
+const updateOfferContentStmt = db.prepare(`
+  UPDATE offers
+  SET title = ?, description = ?
+  WHERE id = ?
+`);
+
 const listMemberIdsStmt = db.prepare("SELECT id FROM members");
 const listMembersStmt = db.prepare(`
   SELECT m.id, m.email, m.zip_code, m.first_name, m.last_name, m.created_at,
@@ -1000,6 +1006,20 @@ function setOfferActive(offerId, isActive) {
   };
 }
 
+function updateOfferContent(offerId, { title, description }) {
+  const offer = mapOffer(findOfferByIdStmt.get(offerId));
+  if (!offer) {
+    return { ok: false, statusCode: 404, reason: "offer_not_found" };
+  }
+
+  updateOfferContentStmt.run(title, description ?? null, offerId);
+
+  return {
+    ok: true,
+    offer: mapOffer(findOfferByIdStmt.get(offerId))
+  };
+}
+
 const deleteOfferStmt = db.prepare("DELETE FROM offers WHERE id = ?");
 const deleteEntitlementsByOfferStmt = db.prepare("DELETE FROM member_offers WHERE offer_id = ?");
 
@@ -1107,6 +1127,7 @@ export {
   redeemOffer,
   clearVenueProfile,
   setOfferActive,
+  updateOfferContent,
   setVenueEnabled,
   setVenueFeatured,
   syncBarglanceCity,

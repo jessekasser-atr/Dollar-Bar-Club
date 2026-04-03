@@ -1,0 +1,21 @@
+{
+  "appId": "com.barglance.dollarbarclub",
+  "appName": "Dollar Bar Club",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https"
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile",
+    "scheme": "Dollar Bar Club"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 1500,
+      "backgroundColor": "#0a0a0a",
+      "showSpinner": false
+    }
+  }
+}

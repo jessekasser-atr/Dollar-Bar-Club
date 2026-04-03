@@ -8,3 +8,9 @@ data/dbc.sqlite-shm
 .env
 .codex-logs/
 .claude/
+
+# Capacitor iOS native project (generated on macOS CI, not checked in)
+apps/member/ios/
+
+# Signing credentials — never commit
+certs/

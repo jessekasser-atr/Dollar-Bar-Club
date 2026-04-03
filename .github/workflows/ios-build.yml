@@ -19,7 +19,7 @@ env:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -27,6 +27,11 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Install iOS platform
+        run: |
+          xcrun simctl list > /dev/null
+          xcodebuild -downloadPlatform iOS
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -44,6 +49,73 @@ jobs:
       - name: Sync web assets to native project
         working-directory: apps/member
         run: npx cap sync ios
+
+      - name: Generate app icon PNGs
+        run: |
+          pip3 install --break-system-packages Pillow
+          python3 scripts/generate_icons.py
+
+      - name: Install app icon in Xcode asset catalog
+        run: |
+          ICON_SET=apps/member/ios/App/App/Assets.xcassets/AppIcon.appiconset
+          cp apps/member/public/icons/icon-1024.png "$ICON_SET/AppIcon-1024.png"
+          cat > "$ICON_SET/Contents.json" << 'JSON'
+          {
+            "images": [
+              {
+                "filename": "AppIcon-1024.png",
+                "idiom": "universal",
+                "platform": "ios",
+                "size": "1024x1024"
+              }
+            ],
+            "info": {
+              "author": "xcode",
+              "version": 1
+            }
+          }
+          JSON
+
+      - name: Patch AppDelegate for Capacitor 8 + Xcode 16 compatibility
+        working-directory: apps/member/ios/App/App
+        run: |
+          cat > AppDelegate.swift << 'SWIFT'
+          import UIKit
+          import Capacitor
+
+          @UIApplicationMain
+          class AppDelegate: UIResponder, UIApplicationDelegate {
+
+              var window: UIWindow?
+
+              func application(_ application: UIApplication,
+                               didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+                  return true
+              }
+
+              func application(_ app: UIApplication,
+                               open url: URL,
+                               options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+                  return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+              }
+
+              func applicationWillResignActive(_ application: UIApplication) {}
+              func applicationDidEnterBackground(_ application: UIApplication) {}
+              func applicationWillEnterForeground(_ application: UIApplication) {}
+              func applicationDidBecomeActive(_ application: UIApplication) {}
+              func applicationWillTerminate(_ application: UIApplication) {}
+
+              func application(_ application: UIApplication,
+                               didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+                  NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+              }
+
+              func application(_ application: UIApplication,
+                               didFailToRegisterForRemoteNotificationsWithError error: Error) {
+                  NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+              }
+          }
+          SWIFT
 
       - name: Set app version from package.json
         working-directory: apps/member
@@ -63,9 +135,30 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string 'Dollar Bar Club needs your location to verify you are at the venue when redeeming your drink offer.'" Info.plist 2>/dev/null \
             || /usr/libexec/PlistBuddy -c "Set :NSLocationWhenInUseUsageDescription 'Dollar Bar Club needs your location to verify you are at the venue when redeeming your drink offer.'" Info.plist
 
-      - name: Install CocoaPods
+      - name: Install CocoaPods (if needed)
         working-directory: apps/member/ios/App
-        run: pod install
+        run: |
+          if [ -f Podfile ]; then
+            pod install
+          else
+            echo "No Podfile found — using Swift Package Manager (Capacitor 6+)"
+          fi
+
+      - name: Detect Xcode project type
+        working-directory: apps/member/ios/App
+        run: |
+          if [ -d App.xcworkspace ]; then
+            echo "BUILD_TARGET=-workspace App.xcworkspace" >> "$GITHUB_ENV"
+          else
+            echo "BUILD_TARGET=-project App.xcodeproj" >> "$GITHUB_ENV"
+          fi
+
+      - name: Resolve Swift packages
+        working-directory: apps/member/ios/App
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            ${{ env.BUILD_TARGET }} \
+            -scheme App
 
       - name: Import signing certificate
         env:
@@ -111,31 +204,40 @@ jobs:
       - name: Build archive
         working-directory: apps/member/ios/App
         run: |
+          set -eo pipefail
           xcodebuild archive \
-            -workspace App.xcworkspace \
+            ${{ env.BUILD_TARGET }} \
             -scheme App \
             -configuration Release \
             -archivePath $RUNNER_TEMP/App.xcarchive \
-            -destination 'generic/platform=iOS' \
+            -sdk iphoneos \
             CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=2V4X7M6A4G \
             PROVISIONING_PROFILE_SPECIFIER="${{ env.PROVISION_UUID }}" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PRODUCT_BUNDLE_IDENTIFIER=com.barglance.dollarbarclub \
             MARKETING_VERSION="${{ env.APP_VERSION }}" \
             CURRENT_PROJECT_VERSION="${{ env.APP_BUILD }}" \
-            | xcpretty
+            2>&1 | tee $RUNNER_TEMP/build.log
+          echo "--- Archive contents ---"
+          ls -la $RUNNER_TEMP/App.xcarchive/Products/Applications/ || echo "No archive products found"
+
+      - name: Show build errors (if failed)
+        if: failure()
+        run: grep -iE '(error:|fatal error|failed)' $RUNNER_TEMP/build.log | head -40 || echo "No error lines found"
 
       - name: Export IPA
         run: |
-          cat > $RUNNER_TEMP/ExportOptions.plist << 'PLIST'
+          set -eo pipefail
+          cat > $RUNNER_TEMP/ExportOptions.plist << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>app-store-connect</string>
-            <key>destination</key>
-            <string>upload</string>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>2V4X7M6A4G</string>
             <key>signingStyle</key>
             <string>manual</string>
             <key>provisioningProfiles</key>
@@ -145,13 +247,15 @@ jobs:
             </dict>
           </dict>
           </plist>
-          PLIST
+          EOF
 
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/App.xcarchive \
             -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist \
             -exportPath $RUNNER_TEMP/export \
-            | xcpretty
+            2>&1 | tee $RUNNER_TEMP/export.log | tail -30
+          echo "--- Export contents ---"
+          ls -la $RUNNER_TEMP/export/ || echo "Export directory not found"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
@@ -162,19 +266,28 @@ jobs:
       - name: Upload to App Store Connect
         if: inputs.upload_to_appstore
         env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
-          KEY_PATH=$RUNNER_TEMP/asc_key.p8
-          echo "$APP_STORE_CONNECT_API_KEY" > "$KEY_PATH"
+          mkdir -p ~/.private_keys
+          KEY_FILE=~/.private_keys/AuthKey_${ASC_KEY_ID}.p8
+          if printf '%s' "$ASC_PRIVATE_KEY" | grep -q '\\n'; then
+            printf '%b' "$ASC_PRIVATE_KEY" > "$KEY_FILE"
+          else
+            printf '%s\n' "$ASC_PRIVATE_KEY" > "$KEY_FILE"
+          fi
+          chmod 600 "$KEY_FILE"
+
+          echo "--- Key file check ---"
+          head -1 "$KEY_FILE"
+          wc -l "$KEY_FILE"
 
           xcrun altool --upload-app \
             -f $RUNNER_TEMP/export/*.ipa \
             -t ios \
-            --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
-            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID" \
-            --apiKeyPath "$KEY_PATH"
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
 
       - name: Cleanup keychain
         if: always()

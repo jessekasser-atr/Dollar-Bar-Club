@@ -405,6 +405,58 @@ function offerAdminCard(offer) {
   const actions = document.createElement("div");
   actions.className = "card-actions";
 
+  const editBtn = document.createElement("button");
+  editBtn.className = "secondary";
+  editBtn.textContent = "Edit";
+  editBtn.addEventListener("click", () => {
+    const titleEl = wrap.querySelector("h3");
+    const descEl = wrap.querySelector("p");
+
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.value = offer.title;
+    titleInput.style.cssText = "width:100%;font-size:1.1em;font-weight:600;margin-bottom:6px;padding:4px 6px;";
+
+    const descInput = document.createElement("input");
+    descInput.type = "text";
+    descInput.value = offer.description || "";
+    descInput.placeholder = "Description (optional)";
+    descInput.style.cssText = "width:100%;margin-bottom:6px;padding:4px 6px;";
+
+    titleEl.replaceWith(titleInput);
+    descEl.replaceWith(descInput);
+    titleInput.focus();
+
+    editBtn.textContent = "Save";
+    editBtn.className = "";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "secondary";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", () => loadAdminOffers());
+    editBtn.parentElement.insertBefore(cancelBtn, editBtn.nextSibling);
+
+    editBtn.removeEventListener("click", arguments.callee);
+    editBtn.addEventListener("click", async () => {
+      const newTitle = titleInput.value.trim();
+      if (!newTitle) { titleInput.focus(); return; }
+      editBtn.disabled = true;
+      cancelBtn.disabled = true;
+      try {
+        const data = await jsonFetch(`/admin/offers/${encodeURIComponent(offer.id)}/content`, {
+          method: "POST",
+          headers: getAdminHeaders(),
+          body: JSON.stringify({ title: newTitle, description: descInput.value.trim() || null })
+        });
+        renderResult(true, data);
+        await loadAdminOffers();
+      } catch (error) {
+        renderResult(false, { ok: false, reason: "edit_offer_failed", error: String(error) });
+        editBtn.disabled = false;
+        cancelBtn.disabled = false;
+      }
+    });
+  });
+
   const toggleBtn = document.createElement("button");
   toggleBtn.className = offer.isActive ? "secondary" : "";
   toggleBtn.textContent = offer.isActive ? "Deactivate" : "Activate";
@@ -460,6 +512,7 @@ function offerAdminCard(offer) {
     }
   });
 
+  actions.appendChild(editBtn);
   actions.appendChild(useBtn);
   actions.appendChild(toggleBtn);
   actions.appendChild(deleteBtn);

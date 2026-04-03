@@ -18,6 +18,7 @@ import {
   listVenues,
   redeemOffer,
   setOfferActive,
+  updateOfferContent,
   setVenueEnabled,
   setVenueFeatured,
   syncBarglanceCity,
@@ -291,6 +292,25 @@ app.get("/admin/offers", requireAdminAccess, (_req, res) => {
 
 app.post("/admin/offers/:id/active", requireAdminAccess, (req, res) => {
   const result = setOfferActive(req.params.id, Boolean(req.body?.isActive));
+
+  if (!result.ok) {
+    return res.status(result.statusCode).json({ ok: false, reason: result.reason });
+  }
+
+  return res.json(result);
+});
+
+app.post("/admin/offers/:id/content", requireAdminAccess, (req, res) => {
+  const { title, description } = req.body || {};
+
+  if (!title || typeof title !== "string" || !title.trim()) {
+    return res.status(400).json({ ok: false, reason: "title_required" });
+  }
+
+  const result = updateOfferContent(req.params.id, {
+    title: title.trim(),
+    description: description != null ? String(description).trim() || null : null
+  });
 
   if (!result.ok) {
     return res.status(result.statusCode).json({ ok: false, reason: result.reason });

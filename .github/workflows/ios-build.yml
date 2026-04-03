@@ -30,7 +30,6 @@ jobs:
 
       - name: Install iOS platform SDK
         run: |
-          xcodebuild -runFirstLaunch
           xcodebuild -downloadPlatform iOS
           xcodebuild -showsdks | grep iphoneos
 

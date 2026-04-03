@@ -210,7 +210,7 @@ jobs:
             -scheme App \
             -configuration Release \
             -archivePath $RUNNER_TEMP/App.xcarchive \
-            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=2V4X7M6A4G \
             PROVISIONING_PROFILE_SPECIFIER="${{ env.PROVISION_UUID }}" \

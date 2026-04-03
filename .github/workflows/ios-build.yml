@@ -28,6 +28,12 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
 
+      - name: Install iOS platform SDK
+        run: |
+          xcodebuild -runFirstLaunch
+          xcodebuild -downloadPlatform iOS
+          xcodebuild -showsdks | grep iphoneos
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -154,11 +160,6 @@ jobs:
           xcodebuild -resolvePackageDependencies \
             ${{ env.BUILD_TARGET }} \
             -scheme App
-
-      - name: Install iOS platform
-        run: |
-          xcodebuild -downloadPlatform iOS || echo "Download skipped — SDK may already be installed"
-          xcodebuild -showsdks | grep iphoneos
 
       - name: Import signing certificate
         env:

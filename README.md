@@ -208,6 +208,7 @@ All admin routes require the `X-Admin-Key` header.
 | `POST` | `/admin/venues/:id/profile/reset` | Clear curated display overrides |
 | `GET` | `/admin/offers` | List all offers |
 | `POST` | `/offers` | Create offer and backfill entitlements |
+| `POST` | `/admin/offers/:id/content` | Update offer title and description |
 | `POST` | `/admin/offers/:id/active` | Toggle offer active state |
 | `DELETE` | `/admin/offers/:id` | Delete offer and related entitlements |
 | `POST` | `/admin/sync/barglance` | Sync venues from BarGlance |

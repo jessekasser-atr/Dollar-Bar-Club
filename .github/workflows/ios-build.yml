@@ -47,7 +47,7 @@ jobs:
 
       - name: Generate app icon PNGs
         run: |
-          pip3 install Pillow
+          pip3 install --break-system-packages Pillow
           python3 scripts/generate_icons.py
 
       - name: Install app icon in Xcode asset catalog

@@ -1,6 +1,6 @@
 # Dollar Bar Club — iOS App Store Submission Guide
 
-> Status: **Build pipeline verified on March 31, 2026** | Target: Apple App Store via Capacitor wrapper
+> Status: **Build pipeline verified on April 4, 2026** | Target: Apple App Store via Capacitor wrapper
 
 ---
 
@@ -40,10 +40,15 @@ via `window.Capacitor.isNativePlatform()`).
 - [x] Privacy policy page at `website/privacy.html`
 - [x] Icon generation script at `scripts/generate_icons.py`
 - [x] GitHub Actions workflow builds, signs, exports, and uploads successfully to App Store Connect
+- [x] GitHub Actions workflow targets Xcode 26 for Apple's April 28, 2026 SDK cutoff
 
 ---
 
 ## Remaining Steps
+
+Apple submission requirement:
+
+- Starting **April 28, 2026**, iOS uploads to App Store Connect must be built with **Xcode 26 or later** using the **iOS 26 SDK or later**
 
 > **No Mac needed.** A GitHub Actions workflow (`.github/workflows/ios-build.yml`)
 > handles the entire Xcode build, signing, and upload on cloud macOS runners.
@@ -61,7 +66,7 @@ npx cap add ios
 ```
 
 This creates `apps/member/ios/` with a full Xcode project. Requires macOS
-with Xcode 15+ and CocoaPods installed.
+with Xcode 26+ and CocoaPods installed for current App Store submissions.
 
 ### 2. Sync web assets
 

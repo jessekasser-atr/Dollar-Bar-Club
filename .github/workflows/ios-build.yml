@@ -43,12 +43,10 @@ jobs:
         run: npm ci
 
       - name: Add iOS platform
-        working-directory: apps/member
-        run: npx cap add ios
+        run: npm run cap:add-ios -w @dbc/member
 
       - name: Sync web assets to native project
-        working-directory: apps/member
-        run: npx cap sync ios
+        run: npm run cap:sync -w @dbc/member
 
       - name: Generate app icon PNGs
         run: |

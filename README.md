@@ -2,7 +2,7 @@
 
 Monorepo for Dollar Bar Club (DBC), operated by BarGlance. The pilot is live in Austin, TX.
 
-Dollar Bar Club is a BarGlance product. The public DBC experience sits on top of a DBC-specific app layer and backend service, while using the BarGlance API to help populate venue data. Dollar Bar Club started as a marketing website with a waitlist flow, then expanded into a live member app, internal admin console, and Render-hosted backend service. Today the repo contains both the public website stack and the product stack that powers the Austin pilot. The member app is currently live as a web app/PWA and is also the codebase being packaged for iOS/App Store distribution via Capacitor.
+Dollar Bar Club is a BarGlance product. The public DBC experience sits on top of a DBC-specific app layer and backend service, while using the BarGlance API to help populate venue data. Dollar Bar Club started as a marketing website with a waitlist flow, then expanded into a live member app, internal admin console, and Render-hosted backend service. Today the repo contains both the public website stack and the product stack that powers the Austin pilot. The member app is live as a web app/PWA and as a native iOS app in the App Store, both built from the same codebase via Capacitor.
 
 ## Current Scope
 
@@ -12,7 +12,7 @@ Dollar Bar Club is a BarGlance product. The public DBC experience sits on top of
 - Internal BarGlance admin console at `dollarbarclub.com/admin` for updating app content
 - Backend service on Render backed by SQLite
 - BarGlance API integration for venue/bar data population
-- Shared member app codebase being used for ongoing iOS/App Store work
+- Native iOS app live in the App Store (Capacitor-wrapped member app)
 
 ## Live URLs
 
@@ -24,6 +24,7 @@ Dollar Bar Club is a BarGlance product. The public DBC experience sits on top of
 | Website waitlist APIs | `dollarbarclub.com/api/signup`, `dollarbarclub.com/api/stats`, `dollarbarclub.com/api/bar-signup` | Vercel Functions |
 | App backend routes | `dollarbarclub.com/api/*` | Vercel proxy -> Render |
 | App backend (direct) | `dbc-api.onrender.com` | Render |
+| iOS app | `com.barglance.dollarbarclub` | Apple App Store |
 
 ## Product Goals
 
@@ -38,8 +39,8 @@ Dollar Bar Club is a BarGlance product. The public DBC experience sits on top of
 1. The public website launched first with marketing copy and a waitlist signup flow.
 2. Waitlist leads and related form activity were stored via Vercel serverless functions backed by Supabase.
 3. The member app, admin console, and API were added next and deployed live on Vercel and Render.
-4. The web app remains the live production experience today.
-5. The current transition is packaging the member app for iOS/App Store release using Capacitor.
+4. The web app went live as the first production experience.
+5. The member app was packaged for iOS via Capacitor and released on the App Store in April 2026.
 
 ## Source Of Truth
 
@@ -149,7 +150,7 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 - Venue browsing and venue detail views
 - Geolocation-based redemption
 - PWA installability
-- Shared codebase for current iOS/App Store packaging work
+- Shared codebase with the live iOS App Store release (via Capacitor)
 
 ### Admin Console
 
@@ -278,7 +279,7 @@ In-memory limiters reset on API restart.
 |---|---|---|
 | `PORT` | Yes | API listen port (default `8787`) |
 | `ADMIN_ACCESS_KEY` | Yes | Shared secret for admin console and protected API routes |
-| `ALLOWED_ORIGINS` | Yes | Comma-separated list of allowed CORS origins |
+| `ALLOWED_ORIGINS` | Yes | Comma-separated list of allowed CORS origins (Capacitor WebView origins are always appended automatically) |
 | `BARGLANCE_API_KEY` | Optional | BarGlance partner API key for venue sync |
 | `BAR_DATA_SOURCE` | Optional | `"seed"` (default) or `"barglance"` |
 
@@ -310,13 +311,13 @@ Managed in Vercel project settings. The serverless functions in `website/api/` u
 | API code in `apps/api/` | Push to `main` -> Manual Deploy in Render dashboard (no auto-deploy) |
 | Member app source in `apps/member/public/` | Copy to `website/app/` before pushing live web changes |
 | Admin console source in `apps/web/public/` | Copy to `website/admin/` before pushing live web changes |
-| iOS/App Store packaging changes | Update `apps/member/` Capacitor config/assets and continue App Store workflow separately from Vercel |
+| iOS app update | Update `apps/member/`, push to `main`, then run the iOS Build workflow in GitHub Actions to build and upload to App Store Connect |
 
 ## iOS CI/CD
 
 The iOS build and upload pipeline runs via GitHub Actions (`.github/workflows/ios-build.yml`). It builds the Capacitor-wrapped member app into an IPA and optionally uploads to App Store Connect.
 
-- **Runner**: macOS 15 with Xcode 16.2
+- **Runner**: macOS 15 with Xcode 26.3
 - **Signing**: Manual code signing using a distribution certificate (`certs/`) and App Store provisioning profile, imported from GitHub Secrets at build time
 - **Assets**: App icons generated via `scripts/generate_icons.py` and copied into the Xcode asset catalog during the build
 - **Build output**: IPA artifact uploaded to GitHub Actions storage
@@ -337,9 +338,9 @@ The iOS build and upload pipeline runs via GitHub Actions (`.github/workflows/io
 ## Production Config
 
 - Database: SQLite at `data/dbc.sqlite` on Render persistent disk (paid tier, persists across deploys and restarts)
-- CORS: allowlisted via `ALLOWED_ORIGINS`
+- CORS: allowlisted via `ALLOWED_ORIGINS` (Capacitor WebView origins are always included automatically)
 - Admin auth: shared `ADMIN_ACCESS_KEY` gate — the admin console prompts for it before loading, API routes validate via `X-Admin-Key` header
-- Member app API base: `/api` in production through Vercel rewrite
+- Member app API base: `/api` in production through Vercel rewrite; `https://dbc-api.onrender.com` for the native iOS app
 - Venue profile source of truth:
   - BarGlance sync provides the base venue data layer
   - Curated profile override fields replace the base layer for member-facing display

@@ -33,6 +33,11 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:5173",
   "http://localhost:5174"
 ];
+const CAPACITOR_ORIGINS = [
+  "capacitor://localhost",
+  "ionic://localhost",
+  "https://localhost"
+];
 const ADMIN_KEY_HEADER = "x-admin-key";
 const CLAIM_WINDOW_MS = 15 * 60 * 1000;
 const CLAIM_MAX_REQUESTS = 5;
@@ -45,7 +50,8 @@ function getAllowedOrigins() {
     .map((origin) => origin.trim())
     .filter(Boolean);
 
-  return configured.length ? configured : DEFAULT_ALLOWED_ORIGINS;
+  const base = configured.length ? configured : DEFAULT_ALLOWED_ORIGINS;
+  return [...new Set([...base, ...CAPACITOR_ORIGINS])];
 }
 
 function getRequestIp(req) {

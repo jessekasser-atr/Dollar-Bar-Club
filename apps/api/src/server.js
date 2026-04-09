@@ -9,6 +9,7 @@ import {
   deleteVenue,
   getActiveOffers,
   getCounts,
+  getWeeklyResetInfo,
   listOffers,
   getVenueOffers,
   listEnabledVenues,
@@ -250,7 +251,7 @@ app.get("/offers/active", (req, res) => {
     return res.status(404).json({ ok: false, reason: "membership_not_found" });
   }
 
-  return res.json({ ok: true, offers: active });
+  return res.json({ ok: true, offers: active, weeklyReset: getWeeklyResetInfo() });
 });
 
 app.post("/offers", requireAdminAccess, (req, res) => {
@@ -368,7 +369,10 @@ app.post("/redeem", redeemRateLimiter, (req, res) => {
       });
     }
 
-    return res.json(result);
+    return res.json({
+      ...result,
+      weeklyReset: getWeeklyResetInfo()
+    });
   } catch (err) {
     console.error("Redeem error:", err);
     return res.status(500).json({ ok: false, reason: "internal_error" });
@@ -531,7 +535,8 @@ app.get("/venues/:id", (req, res) => {
   return res.json({
     ok: true,
     venue: venueBundle.venue,
-    offers: venueBundle.offers
+    offers: venueBundle.offers,
+    weeklyReset: getWeeklyResetInfo()
   });
 });
 

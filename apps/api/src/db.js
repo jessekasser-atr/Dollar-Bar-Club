@@ -11,9 +11,90 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const DATA_DIR = path.join(REPO_ROOT, "data");
 const DB_PATH = path.join(DATA_DIR, "dbc.sqlite");
+const AUSTIN_TIME_ZONE = "America/Chicago";
+const WEEKDAY_TO_INDEX = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6
+};
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function getZonedDateParts(date, timeZone = AUSTIN_TIME_ZONE) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  });
+
+  const parts = formatter.formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type)?.value;
+
+  return {
+    year: Number(get("year")),
+    month: Number(get("month")),
+    day: Number(get("day")),
+    weekday: get("weekday"),
+    hour: Number(get("hour")),
+    minute: Number(get("minute")),
+    second: Number(get("second"))
+  };
+}
+
+function getTimeZoneOffsetMs(date, timeZone = AUSTIN_TIME_ZONE) {
+  const parts = getZonedDateParts(date, timeZone);
+  const zonedAsUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
+  return zonedAsUtc - date.getTime();
+}
+
+function zonedMidnightToUtcIso(year, month, day, timeZone = AUSTIN_TIME_ZONE) {
+  const utcGuess = Date.UTC(year, month - 1, day, 0, 0, 0);
+  const offsetMs = getTimeZoneOffsetMs(new Date(utcGuess), timeZone);
+  return new Date(utcGuess - offsetMs).toISOString();
+}
+
+function getWeeklyResetInfo(referenceDate = new Date()) {
+  const local = getZonedDateParts(referenceDate, AUSTIN_TIME_ZONE);
+  const weekdayIndex = WEEKDAY_TO_INDEX[local.weekday] ?? 0;
+  const localDate = new Date(Date.UTC(local.year, local.month - 1, local.day));
+  localDate.setUTCDate(localDate.getUTCDate() - weekdayIndex);
+
+  const currentWeekYear = localDate.getUTCFullYear();
+  const currentWeekMonth = localDate.getUTCMonth() + 1;
+  const currentWeekDay = localDate.getUTCDate();
+
+  const nextWeekDate = new Date(localDate.getTime());
+  nextWeekDate.setUTCDate(nextWeekDate.getUTCDate() + 7);
+
+  return {
+    timeZone: AUSTIN_TIME_ZONE,
+    label: "Resets every Sunday at 12:00 AM Austin time",
+    currentWeekStartAt: zonedMidnightToUtcIso(currentWeekYear, currentWeekMonth, currentWeekDay),
+    nextResetAt: zonedMidnightToUtcIso(
+      nextWeekDate.getUTCFullYear(),
+      nextWeekDate.getUTCMonth() + 1,
+      nextWeekDate.getUTCDate()
+    )
+  };
 }
 
 function createId(prefix) {
@@ -138,6 +219,26 @@ function mapEntitlement(row) {
         redeemedAt: row.redeemed_at
       }
     : null;
+}
+
+function normalizeEntitlement(entitlement, referenceDate = new Date()) {
+  if (!entitlement) {
+    return null;
+  }
+
+  const resetInfo = getWeeklyResetInfo(referenceDate);
+  const redeemedAtMs = entitlement.redeemedAt ? Date.parse(entitlement.redeemedAt) : Number.NaN;
+  const currentWeekStartMs = Date.parse(resetInfo.currentWeekStartAt);
+  const redeemedThisWeek =
+    entitlement.status === "redeemed" &&
+    Number.isFinite(redeemedAtMs) &&
+    redeemedAtMs >= currentWeekStartMs;
+
+  return {
+    ...entitlement,
+    status: redeemedThisWeek ? "redeemed" : "issued",
+    redeemedAt: redeemedThisWeek ? entitlement.redeemedAt : null
+  };
 }
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -588,6 +689,7 @@ function getMembershipByToken(token) {
 }
 
 function getActiveOffers({ venueId = null, membershipToken = null } = {}) {
+  const resetInfo = getWeeklyResetInfo();
   const offers = listActiveOffersStmt
     .all({ nowIso: nowIso(), venueId, enabledOnly: membershipToken ? 1 : 0 })
     .map((row) => hydrateOfferRow(row));
@@ -602,11 +704,14 @@ function getActiveOffers({ venueId = null, membershipToken = null } = {}) {
   }
 
   return offers.map((offer) => {
-    const entitlement = mapEntitlement(findEntitlementStmt.get(membership.memberId, offer.id));
+    const entitlement = normalizeEntitlement(
+      mapEntitlement(findEntitlementStmt.get(membership.memberId, offer.id))
+    );
     return {
       ...offer,
       entitlementStatus: entitlement?.status ?? "missing",
-      redeemedAt: entitlement?.redeemedAt ?? null
+      redeemedAt: entitlement?.redeemedAt ?? null,
+      nextResetAt: resetInfo.nextResetAt
     };
   });
 }
@@ -692,6 +797,7 @@ const createOfferTxn = db.transaction((offerInput) => {
 });
 
 function getVenueOffers(venueId, membershipToken = null) {
+  const resetInfo = getWeeklyResetInfo();
   const venue = getVenueById(venueId);
   if (!venue || (membershipToken && !venue.enabled)) {
     return null;
@@ -714,17 +820,21 @@ function getVenueOffers(venueId, membershipToken = null) {
     venue,
     membership,
     offers: offers.map((offer) => {
-      const entitlement = mapEntitlement(findEntitlementStmt.get(membership.memberId, offer.id));
+      const entitlement = normalizeEntitlement(
+        mapEntitlement(findEntitlementStmt.get(membership.memberId, offer.id))
+      );
       return {
         ...offer,
         entitlementStatus: entitlement?.status ?? "missing",
-        redeemedAt: entitlement?.redeemedAt ?? null
+        redeemedAt: entitlement?.redeemedAt ?? null,
+        nextResetAt: resetInfo.nextResetAt
       };
     })
   };
 }
 
 const redeemTxn = db.transaction(({ membershipToken, offerId, venueId, staffId, deviceId }) => {
+  const resetInfo = getWeeklyResetInfo();
   const membership = getMembershipByToken(membershipToken);
   if (!membership) {
     logRedemptionEvent({
@@ -782,7 +892,9 @@ const redeemTxn = db.transaction(({ membershipToken, offerId, venueId, staffId, 
     return { ok: false, statusCode: 400, reason: "offer_inactive" };
   }
 
-  const entitlement = mapEntitlement(findEntitlementStmt.get(membership.memberId, offerId));
+  const entitlement = normalizeEntitlement(
+    mapEntitlement(findEntitlementStmt.get(membership.memberId, offerId))
+  );
   if (!entitlement) {
     logRedemptionEvent({
       memberId: membership.memberId,
@@ -816,7 +928,8 @@ const redeemTxn = db.transaction(({ membershipToken, offerId, venueId, staffId, 
       membershipToken,
       offerId,
       venueId,
-      redeemedAt: entitlement.redeemedAt
+      redeemedAt: entitlement.redeemedAt,
+      nextResetAt: resetInfo.nextResetAt
     };
   }
 
@@ -841,7 +954,8 @@ const redeemTxn = db.transaction(({ membershipToken, offerId, venueId, staffId, 
     membershipToken,
     offerId,
     venueId,
-    redeemedAt: currentIso
+    redeemedAt: currentIso,
+    nextResetAt: resetInfo.nextResetAt
   };
 });
 
@@ -1118,6 +1232,7 @@ export {
   deleteVenue,
   getActiveOffers,
   getCounts,
+  getWeeklyResetInfo,
   getVenueById,
   getVenueOffers,
   listEnabledVenues,

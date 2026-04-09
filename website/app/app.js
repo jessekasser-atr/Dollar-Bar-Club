@@ -179,6 +179,10 @@ function formatDateTime(value) {
   });
 }
 
+function getWeeklyResetLabel(weeklyReset) {
+  return weeklyReset?.label || "Resets every Sunday at 12:00 AM Austin time";
+}
+
 function venueFallbackMarkup(label, sizeClass = "") {
   const initial = escapeHtml(String(label || "DBC").charAt(0).toUpperCase() || "D");
   return `
@@ -426,6 +430,7 @@ async function renderVenueList() {
   try {
     const data = await api("GET", `/offers/active?membershipToken=${encodeURIComponent(token)}`);
     const offers = (data.offers || []).slice();
+    const weeklyResetLabel = getWeeklyResetLabel(data.weeklyReset);
 
     offers.sort((left, right) => {
       if (left.entitlementStatus === "redeemed" && right.entitlementStatus !== "redeemed") {
@@ -546,6 +551,7 @@ async function renderVenueList() {
           <section class="member-summary">
             <div>
               <h2>${counts.live ? "Pick a bar and unlock your member offer." : "Your redeemed venues are saved here."}</h2>
+              <div class="member-summary-note">${escapeHtml(weeklyResetLabel)}</div>
             </div>
             <div class="summary-pill">${venueGroups.length} ${venueGroups.length === 1 ? "venue" : "venues"}</div>
           </section>
@@ -643,6 +649,7 @@ async function renderVenueDetail(venueId) {
     const data = await api("GET", `/venues/${venueId}?membershipToken=${encodeURIComponent(token)}`);
     const venue = data.venue;
     const allOffers = (data.offers || []).slice();
+    const weeklyResetLabel = getWeeklyResetLabel(data.weeklyReset);
     allOffers.sort((a, b) => {
       const aR = a.entitlementStatus === "redeemed" ? 1 : 0;
       const bR = b.entitlementStatus === "redeemed" ? 1 : 0;
@@ -676,6 +683,7 @@ async function renderVenueDetail(venueId) {
           <div class="cta-panel">
             <div>
               <div class="cta-label">When you're there</div>
+              <p>${escapeHtml(`Each special can be redeemed once per week. ${weeklyResetLabel}.`)}</p>
               <ol class="redeem-steps">
                 <li>Tap Redeem below</li>
                 <li>Show the screen to your bartender/server</li>
@@ -693,8 +701,8 @@ async function renderVenueDetail(venueId) {
         if (isRedeemed) {
           ctaMarkup = `
             <div class="info-banner success-banner" style="margin-top:10px;">
-              <strong>Redeemed</strong>
-              <span>${when ? escapeHtml(when) : "You have already used this offer."}</span>
+              <strong>Redeemed this week</strong>
+              <span>${escapeHtml(when ? `Used ${when}. ${weeklyResetLabel}.` : weeklyResetLabel)}</span>
             </div>
           `;
         } else {
@@ -878,7 +886,7 @@ async function onGeoSuccess(position, venue, offer) {
       showModal(`
         <div class="modal-icon modal-icon-success">OK</div>
         <h3 class="modal-success">Already redeemed</h3>
-        <p>${redeemedLabel ? `This offer was already redeemed on ${escapeHtml(redeemedLabel)}.` : "This offer has already been redeemed on your membership."}</p>
+        <p>${escapeHtml(redeemedLabel ? `This offer was already redeemed on ${redeemedLabel}. ${getWeeklyResetLabel(redemption.weeklyReset)}.` : `This offer has already been redeemed this week. ${getWeeklyResetLabel(redemption.weeklyReset)}.`)}</p>
         <button class="btn btn-primary" id="modal-done-btn">Back to venue</button>
       `);
 
@@ -892,7 +900,7 @@ async function onGeoSuccess(position, venue, offer) {
     showModal(`
       <div class="modal-icon modal-icon-success">OK</div>
       <h3 class="modal-success">Offer redeemed</h3>
-      <p>Your ${escapeHtml(offer.title)} at ${escapeHtml(venue.name)} is ready. Show this screen to your bartender.</p>
+      <p>${escapeHtml(`Your ${offer.title} at ${venue.name} is ready. Show this screen to your bartender. ${getWeeklyResetLabel(redemption.weeklyReset)}.`)}</p>
       <button class="btn btn-primary" id="modal-done-btn">Done</button>
     `);
 

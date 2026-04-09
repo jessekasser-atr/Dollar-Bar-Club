@@ -28,7 +28,7 @@ Dollar Bar Club is a BarGlance product. The public DBC experience sits on top of
 
 ## Product Goals
 
-- On-site drink redemption with single-use validation
+- On-site drink redemption with once-per-week, per-offer validation
 - Fast setup for Austin pilot bars
 - Basic internal operator/admin workflows
 - Clear audit trail of redemptions
@@ -146,9 +146,12 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 ### Member App
 
 - Email claim/login flow
+- Shared app shell with left-aligned `DBC` wordmark and overflow menu
+- Member logout action in the app menu
 - Austin ZIP eligibility check
 - Venue browsing and venue detail views
 - Geolocation-based redemption
+- Weekly offer resets every Sunday at `12:00 AM` Austin time
 - PWA installability
 - Shared codebase with the live iOS App Store release (via Capacitor)
 
@@ -167,7 +170,7 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 - Membership issuance and login
 - Venue and offer retrieval
 - Entitlement management
-- Single-use redemption enforcement
+- Weekly redemption enforcement per member, per offer, with Sunday-midnight Austin resets
 - BarGlance API sync support for venue/bar population
 
 ## Pilot Redemption Flow
@@ -175,8 +178,8 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 1. Member opens the member app and claims a pass with email plus Austin ZIP, or signs in with email.
 2. Member browses enabled venues and selects an eligible live offer.
 3. Member taps "Redeem now" and the app verifies on-site presence via geolocation.
-4. The API validates active membership, active offer, valid entitlement, and non-duplication.
-5. The API records the redemption with venue and audit metadata.
+4. The API validates active membership, active offer, and whether that offer has already been redeemed during the current Austin week.
+5. The API records the redemption with venue and audit metadata, then keeps that offer locked until the next Sunday `12:00 AM` Austin reset.
 6. Member shows the confirmation screen to the bartender or server.
 
 ## API Endpoints
@@ -191,7 +194,7 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 | `GET` | `/offers/active` | None | Query: `venueId`, optional `membershipToken` |
 | `GET` | `/venues` | None | Returns enabled pilot venues only |
 | `GET` | `/venues/:id` | None | Venue with offers, optional `membershipToken` enrichment |
-| `POST` | `/redeem` | Rate limited | Redeem single-use entitlement for a venue offer |
+| `POST` | `/redeem` | Rate limited | Redeem an offer once per Austin week (`Sunday 12:00 AM` reset) |
 
 ### Admin
 
@@ -341,6 +344,7 @@ The iOS build and upload pipeline runs via GitHub Actions (`.github/workflows/io
 - CORS: allowlisted via `ALLOWED_ORIGINS` (Capacitor WebView origins are always included automatically)
 - Admin auth: shared `ADMIN_ACCESS_KEY` gate — the admin console prompts for it before loading, API routes validate via `X-Admin-Key` header
 - Member app API base: `/api` in production through Vercel rewrite; `https://dbc-api.onrender.com` for the native iOS app
+- Weekly offer reset: each member can redeem each offer once per Austin week; the reset boundary is Sunday at `12:00 AM` in `America/Chicago`
 - Venue profile source of truth:
   - BarGlance sync provides the base venue data layer
   - Curated profile override fields replace the base layer for member-facing display

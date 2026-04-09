@@ -120,14 +120,98 @@
       padding: 14px 20px;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
       gap: 12px;
     }
 
     .logo {
-      font-size: 28px;
+      font-size: 24px;
       font-weight: 700;
       color: var(--white);
+      letter-spacing: 0.06em;
+    }
+
+    .menu-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--white);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .menu-btn:hover,
+    .menu-btn:focus-visible {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(53, 208, 111, 0.32);
+      box-shadow: 0 0 0 4px rgba(53, 208, 111, 0.12);
+      outline: none;
+    }
+
+    .menu-icon {
+      display: inline-flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      width: 16px;
+    }
+
+    .menu-icon span {
+      display: block;
+      width: 16px;
+      height: 2px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .nav-menu {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 20px;
+      min-width: 164px;
+      padding: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      background: rgba(10, 14, 12, 0.98);
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-6px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    .nav.menu-open .nav-menu {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .nav-menu-btn {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 12px 14px;
+      border: none;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--white);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .nav-menu-btn:hover,
+    .nav-menu-btn:focus-visible {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--accent);
+      outline: none;
     }
 
     .badge,
@@ -975,6 +1059,11 @@
     }
 
     @media (max-width: 420px) {
+      .nav-inner {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
       .hero h1 {
         font-size: 29px;
       }

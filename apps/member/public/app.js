@@ -23,6 +23,7 @@ function resolveApiBase() {
 
 const API_BASE = resolveApiBase();
 const GEO_RADIUS_METERS = 200;
+let isMenuOpen = false;
 
 async function api(method, path, body) {
   const options = {
@@ -71,6 +72,44 @@ const appEl = document.getElementById("app");
 
 function render(html) {
   appEl.innerHTML = html;
+  bindShellActions();
+}
+
+function bindShellActions() {
+  document.getElementById("nav-menu-btn")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleMenu();
+  });
+
+  document.getElementById("logout-btn")?.addEventListener("click", () => {
+    closeMenu();
+    clearToken();
+    navigate("#/");
+    renderOnboarding();
+  });
+}
+
+function closeMenu() {
+  if (!isMenuOpen) return;
+  isMenuOpen = false;
+  syncMenuState();
+}
+
+function toggleMenu() {
+  isMenuOpen = !isMenuOpen;
+  syncMenuState();
+}
+
+function syncMenuState() {
+  const nav = document.querySelector(".nav");
+  const menuButton = document.getElementById("nav-menu-btn");
+  if (!nav || !menuButton) {
+    isMenuOpen = false;
+    return;
+  }
+
+  nav.classList.toggle("menu-open", isMenuOpen);
+  menuButton.setAttribute("aria-expanded", isMenuOpen ? "true" : "false");
 }
 
 function shell(content, options = {}) {
@@ -98,10 +137,28 @@ function shell(content, options = {}) {
       <a href="https://www.barglance.com/" target="_blank" rel="noopener noreferrer">Powered by <span class="brand">BarGlance</span></a>
     </div>
     <div class="app-shell">
-      <div class="nav">
+      <div class="nav ${isMenuOpen && getToken() ? "menu-open" : ""}">
         <div class="nav-inner">
-          <div class="logo">Dollar Bar Club</div>
+          <div class="logo">DBC</div>
+          ${
+            getToken()
+              ? `
+                <button class="menu-btn" id="nav-menu-btn" type="button" aria-label="Open menu" aria-expanded="${isMenuOpen ? "true" : "false"}" aria-controls="nav-menu">
+                  <span class="menu-icon" aria-hidden="true"><span></span><span></span><span></span></span>
+                </button>
+              `
+              : ""
+          }
         </div>
+        ${
+          getToken()
+            ? `
+              <div class="nav-menu" id="nav-menu">
+                <button class="nav-menu-btn" id="logout-btn" type="button">Log out</button>
+              </div>
+            `
+            : ""
+        }
       </div>
       ${heroBlock}
       <main class="main wrap ${hideHero ? "main-no-hero" : ""}">${content}</main>
@@ -899,6 +956,7 @@ function onGeoError(venue) {
 
 function onRouteChange() {
   window.scrollTo(0, 0);
+  closeMenu();
   const token = getToken();
   const route = getRoute();
 
@@ -916,6 +974,13 @@ function onRouteChange() {
 }
 
 window.addEventListener("hashchange", onRouteChange);
+document.addEventListener("click", (event) => {
+  const nav = document.querySelector(".nav");
+  if (!isMenuOpen || !nav || nav.contains(event.target)) {
+    return;
+  }
+  closeMenu();
+});
 
 (function setupNavScrollHide() {
   let lastScrollY = 0;

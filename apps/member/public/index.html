@@ -622,25 +622,24 @@
       z-index: 1;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      min-height: 44px;
-      padding: 10px 16px;
+      justify-content: center;
+      width: 52px;
+      height: 52px;
       border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.28);
       background: rgba(8, 11, 9, 0.92);
       box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
       color: var(--white);
       text-decoration: none;
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
+      font-size: 0;
     }
 
     .detail-back::before {
-      content: "\2039";
-      font-size: 20px;
+      content: "\2190";
+      font-size: 28px;
+      font-weight: 700;
       line-height: 1;
       color: var(--accent);
     }

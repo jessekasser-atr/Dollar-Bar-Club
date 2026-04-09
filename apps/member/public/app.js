@@ -673,7 +673,7 @@ async function renderVenueDetail(venueId) {
             <div class="detail-hero-wrap">
               ${imageMarkup(venue.imageUrl, venue.name, "detail-hero-image", venue.name, "image-fallback-hero")}
               <div class="detail-hero-overlay"></div>
-              <a class="detail-back" href="#/">Back to all bars</a>
+              <a class="detail-back" href="#/" aria-label="Back to all bars" title="Back to all bars"></a>
               <div class="detail-hero-copy">
                 <h2 class="detail-name">${escapeHtml(venue.name)}</h2>
                 ${summaryParts.length ? `<div class="detail-summary">${escapeHtml(summaryParts.join(" | "))}</div>` : ""}

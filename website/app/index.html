@@ -608,7 +608,7 @@
 
     .detail-back {
       position: absolute;
-      top: 18px;
+      top: 14px;
       left: 18px;
       z-index: 1;
       display: inline-flex;
@@ -628,11 +628,22 @@
     }
 
     .detail-back::before {
-      content: "\2190";
-      font-size: 28px;
-      font-weight: 700;
-      line-height: 1;
-      color: var(--accent);
+      content: "";
+      width: 18px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--accent);
+      transform: translate(3px, -1px);
+    }
+
+    .detail-back::after {
+      content: "";
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-left: 4px solid var(--accent);
+      border-bottom: 4px solid var(--accent);
+      transform: translate(-7px, -1px) rotate(45deg);
     }
 
     .detail-back:hover,

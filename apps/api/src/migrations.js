@@ -287,6 +287,12 @@ const migrations = [
     run(db) {
       ensureColumn(db, "venues", "featured", "featured INTEGER NOT NULL DEFAULT 0");
     }
+  },
+  {
+    id: "008_offer_weekday_schedule",
+    run(db) {
+      ensureColumn(db, "offers", "available_days", "available_days TEXT");
+    }
   }
 ];
 

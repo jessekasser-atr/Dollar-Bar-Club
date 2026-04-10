@@ -24,6 +24,15 @@ let allRedemptions = [];
 let allMembers = [];
 let ui = null;
 let selectedProfileVenueId = null;
+const WEEKDAY_OPTIONS = [
+  { value: 0, shortLabel: "Sun", fullLabel: "Sunday" },
+  { value: 1, shortLabel: "Mon", fullLabel: "Monday" },
+  { value: 2, shortLabel: "Tue", fullLabel: "Tuesday" },
+  { value: 3, shortLabel: "Wed", fullLabel: "Wednesday" },
+  { value: 4, shortLabel: "Thu", fullLabel: "Thursday" },
+  { value: 5, shortLabel: "Fri", fullLabel: "Friday" },
+  { value: 6, shortLabel: "Sat", fullLabel: "Saturday" }
+];
 
 function renderGate(errorMessage = "") {
   appEl.innerHTML = `
@@ -118,6 +127,7 @@ function renderOpsApp() {
     newOfferTitleEl: document.getElementById("newOfferTitle"),
     newOfferImageUrlEl: document.getElementById("newOfferImageUrl"),
     newOfferDescriptionEl: document.getElementById("newOfferDescription"),
+    newOfferDaysEl: document.getElementById("newOfferDays"),
     selectedVenueSummaryEl: document.getElementById("selectedVenueSummary"),
     offerCreateStatusEl: document.getElementById("offerCreateStatus"),
     saveVenueProfileBtn: document.getElementById("saveVenueProfileBtn"),
@@ -273,6 +283,58 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
+function normalizeAvailableDays(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(
+    value
+      .map((entry) => Number(entry))
+      .filter((entry) => Number.isInteger(entry) && entry >= 0 && entry <= 6)
+  )].sort((left, right) => left - right);
+}
+
+function formatOfferSchedule(offer) {
+  const days = normalizeAvailableDays(offer.availableDays);
+  if (!days.length) {
+    return "Every day";
+  }
+  return days
+    .map((day) => WEEKDAY_OPTIONS.find((entry) => entry.value === day)?.fullLabel || String(day))
+    .join(", ");
+}
+
+function getCheckedDays(container) {
+  if (!container) {
+    return [];
+  }
+
+  return normalizeAvailableDays(
+    Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value)
+  );
+}
+
+function setCheckedDays(container, selectedDays) {
+  const active = new Set(normalizeAvailableDays(selectedDays));
+  container?.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+    input.checked = active.has(Number(input.value));
+  });
+}
+
+function buildDaySelector(selectedDays = []) {
+  const active = new Set(normalizeAvailableDays(selectedDays));
+  const wrap = document.createElement("div");
+  wrap.className = "schedule-grid";
+  wrap.innerHTML = WEEKDAY_OPTIONS.map((day) => `
+    <label class="schedule-option">
+      <input type="checkbox" value="${day.value}" ${active.has(day.value) ? "checked" : ""} />
+      <span>${day.shortLabel}</span>
+    </label>
+  `).join("");
+  return wrap;
+}
+
 function getRedemptionBucket(redemption) {
   if (redemption.result === "denied") {
     return "denied";
@@ -392,6 +454,7 @@ function offerAdminCard(offer) {
   wrap.innerHTML = `
     <div class="pill-row">
       <span class="pill ${offer.isActive ? "pill-ok" : "pill-muted"}">${offer.isActive ? "Active" : "Inactive"}</span>
+      <span class="pill pill-accent">${escapeHtml(offer.isAvailableToday ? "Available Today" : "Scheduled")}</span>
     </div>
     <h3>${escapeHtml(offer.title)}</h3>
     <p>${escapeHtml(offer.description || "")}</p>
@@ -399,6 +462,9 @@ function offerAdminCard(offer) {
       <strong>Offer ID:</strong> ${escapeHtml(offer.id)} |
       <strong>Venue:</strong> ${escapeHtml(offer.venueName || offer.venueId)} |
       <strong>Status:</strong> ${offer.isActive ? "active" : "inactive"}
+    </p>
+    <p style="margin-top:6px;color:#5c6675;">
+      <strong>Available:</strong> ${escapeHtml(formatOfferSchedule(offer))}
     </p>
   `;
 
@@ -423,8 +489,17 @@ function offerAdminCard(offer) {
     descInput.placeholder = "Description (optional)";
     descInput.style.cssText = "width:100%;margin-bottom:6px;padding:4px 6px;";
 
+    const scheduleLabel = document.createElement("div");
+    scheduleLabel.textContent = "Available days";
+    scheduleLabel.style.cssText = "margin:8px 0 6px;font-size:12px;font-weight:600;color:#5c6675;";
+
+    const daySelector = buildDaySelector(offer.availableDays || []);
+    daySelector.style.marginBottom = "6px";
+
     titleEl.replaceWith(titleInput);
     descEl.replaceWith(descInput);
+    descInput.insertAdjacentElement("afterend", daySelector);
+    daySelector.insertAdjacentElement("beforebegin", scheduleLabel);
     titleInput.focus();
 
     editBtn.textContent = "Save";
@@ -445,7 +520,11 @@ function offerAdminCard(offer) {
         const data = await jsonFetch(`/admin/offers/${encodeURIComponent(offer.id)}/content`, {
           method: "POST",
           headers: getAdminHeaders(),
-          body: JSON.stringify({ title: newTitle, description: descInput.value.trim() || null })
+          body: JSON.stringify({
+            title: newTitle,
+            description: descInput.value.trim() || null,
+            availableDays: getCheckedDays(daySelector)
+          })
         });
         renderResult(true, data);
         await loadAdminOffers();
@@ -641,6 +720,7 @@ function renderAdminOffers() {
     if (filter === "inactive" && offer.isActive) return false;
     if (!search) return true;
     const haystack = [offer.id, offer.title, offer.venueId, offer.venueName, offer.description]
+      .concat([formatOfferSchedule(offer)])
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
@@ -872,6 +952,7 @@ function bindEvents() {
     const title = ui.newOfferTitleEl.value.trim();
     const description = ui.newOfferDescriptionEl.value.trim();
     const imageUrl = ui.newOfferImageUrlEl.value.trim();
+    const availableDays = getCheckedDays(ui.newOfferDaysEl);
 
     if (!id || !venueId || !title) {
       renderResult(false, { ok: false, reason: "offer_fields_required" });
@@ -892,15 +973,17 @@ function bindEvents() {
           venueId,
           title,
           description: description || undefined,
-          imageUrl: imageUrl || undefined
+          imageUrl: imageUrl || undefined,
+          availableDays
         })
       });
 
       ui.newOfferTitleEl.value = "";
       ui.newOfferImageUrlEl.value = "";
       ui.newOfferDescriptionEl.value = "";
+      setCheckedDays(ui.newOfferDaysEl, []);
       ui.offerCreateStatusEl.style.color = "#107c41";
-      ui.offerCreateStatusEl.textContent = `Created: ${data.offer.title} for ${data.offer.venueId}.`;
+      ui.offerCreateStatusEl.textContent = `Created: ${data.offer.title} for ${data.offer.venueId} (${formatOfferSchedule(data.offer)}).`;
       await loadAdminOffers();
       renderResult(true, data);
     } catch (error) {

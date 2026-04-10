@@ -165,6 +165,18 @@ function normalizeOptionalText(value) {
   return normalized ? normalized : null;
 }
 
+function normalizeAvailableDays(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(
+    value
+      .map((entry) => Number(entry))
+      .filter((entry) => Number.isInteger(entry) && entry >= 0 && entry <= 6)
+  )].sort((left, right) => left - right);
+}
+
 app.get("/health", (_req, res) => {
   res.json({
     ok: true,
@@ -255,7 +267,7 @@ app.get("/offers/active", (req, res) => {
 });
 
 app.post("/offers", requireAdminAccess, (req, res) => {
-  const { id, venueId, title, description, imageUrl, isActive } = req.body || {};
+  const { id, venueId, title, description, imageUrl, isActive, availableDays } = req.body || {};
 
   const normalizedId = String(id || "").trim();
   const normalizedVenueId = String(venueId || "").trim();
@@ -273,7 +285,8 @@ app.post("/offers", requireAdminAccess, (req, res) => {
     imageUrl: imageUrl ? String(imageUrl).trim() : null,
     startsAt: "2000-01-01T00:00:00.000Z",
     endsAt: "2099-12-31T23:59:59.000Z",
-    isActive: isActive !== false
+    isActive: isActive !== false,
+    availableDays: normalizeAvailableDays(availableDays)
   });
 
   if (!result.ok) {
@@ -308,7 +321,7 @@ app.post("/admin/offers/:id/active", requireAdminAccess, (req, res) => {
 });
 
 app.post("/admin/offers/:id/content", requireAdminAccess, (req, res) => {
-  const { title, description } = req.body || {};
+  const { title, description, availableDays } = req.body || {};
 
   if (!title || typeof title !== "string" || !title.trim()) {
     return res.status(400).json({ ok: false, reason: "title_required" });
@@ -316,7 +329,8 @@ app.post("/admin/offers/:id/content", requireAdminAccess, (req, res) => {
 
   const result = updateOfferContent(req.params.id, {
     title: title.trim(),
-    description: description != null ? String(description).trim() || null : null
+    description: description != null ? String(description).trim() || null : null,
+    availableDays: normalizeAvailableDays(availableDays)
   });
 
   if (!result.ok) {

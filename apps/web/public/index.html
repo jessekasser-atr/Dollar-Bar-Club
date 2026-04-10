@@ -189,6 +189,31 @@
         margin-top: 10px;
       }
       .card-actions button { font-size: 12px; padding: 6px 10px; }
+      .schedule-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .schedule-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        font-size: 13px;
+      }
+      .schedule-option input {
+        width: auto;
+        margin: 0;
+      }
+      .schedule-help {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
 
       .pill-row {
         display: flex;
@@ -442,7 +467,20 @@
             </div>
             <div style="margin-top:10px;">
               <label for="newOfferDescription">Description (Optional)</label>
-              <input id="newOfferDescription" placeholder="Pilot one-time offer for active members." />
+              <input id="newOfferDescription" placeholder="Member offer description." />
+            </div>
+            <div style="margin-top:10px;">
+              <label>Available Days</label>
+              <div id="newOfferDays" class="schedule-grid">
+                <label class="schedule-option"><input type="checkbox" value="0" />Sun</label>
+                <label class="schedule-option"><input type="checkbox" value="1" />Mon</label>
+                <label class="schedule-option"><input type="checkbox" value="2" />Tue</label>
+                <label class="schedule-option"><input type="checkbox" value="3" />Wed</label>
+                <label class="schedule-option"><input type="checkbox" value="4" />Thu</label>
+                <label class="schedule-option"><input type="checkbox" value="5" />Fri</label>
+                <label class="schedule-option"><input type="checkbox" value="6" />Sat</label>
+              </div>
+              <div class="schedule-help">Leave all unchecked to make the offer available every day.</div>
             </div>
             <div class="card-actions" style="margin-top:14px;">
               <button id="createOfferBtn">Create Offer</button>

@@ -21,6 +21,7 @@ const WEEKDAY_TO_INDEX = {
   Fri: 5,
   Sat: 6
 };
+const WEEKDAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function nowIso() {
   return new Date().toISOString();
@@ -109,6 +110,62 @@ function createEntitlementToken() {
   return crypto.randomBytes(8).toString("hex").toUpperCase();
 }
 
+function normalizeAvailableDays(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(
+    value
+      .map((entry) => Number(entry))
+      .filter((entry) => Number.isInteger(entry) && entry >= 0 && entry <= 6)
+  )].sort((left, right) => left - right);
+}
+
+function serializeAvailableDays(value) {
+  const days = normalizeAvailableDays(value);
+  return days.length ? days.join(",") : null;
+}
+
+function parseAvailableDays(value) {
+  if (!value) {
+    return [];
+  }
+
+  return normalizeAvailableDays(String(value).split(","));
+}
+
+function formatAvailabilitySummary(availableDays) {
+  const days = normalizeAvailableDays(availableDays);
+  if (!days.length) {
+    return "Every day";
+  }
+
+  return days.map((day) => WEEKDAY_LABELS[day]).join(", ");
+}
+
+function getAustinWeekdayIndex(referenceDate = new Date()) {
+  const local = getZonedDateParts(referenceDate, AUSTIN_TIME_ZONE);
+  return WEEKDAY_TO_INDEX[local.weekday] ?? 0;
+}
+
+function getOfferAvailability(offer, referenceDate = new Date()) {
+  const startsAtMs = offer.startsAt ? Date.parse(offer.startsAt) : Number.NaN;
+  const endsAtMs = offer.endsAt ? Date.parse(offer.endsAt) : Number.NaN;
+  const referenceMs = referenceDate.getTime();
+  const withinStart = !Number.isFinite(startsAtMs) || referenceMs >= startsAtMs;
+  const withinEnd = !Number.isFinite(endsAtMs) || referenceMs <= endsAtMs;
+  const availableDays = normalizeAvailableDays(offer.availableDays);
+  const weekdayIndex = getAustinWeekdayIndex(referenceDate);
+  const matchesDay = !availableDays.length || availableDays.includes(weekdayIndex);
+
+  return {
+    availableDays,
+    availabilitySummary: formatAvailabilitySummary(availableDays),
+    isAvailableToday: Boolean(offer.isActive) && withinStart && withinEnd && matchesDay
+  };
+}
+
 function slugify(value) {
   return String(value || "")
     .toLowerCase()
@@ -181,6 +238,7 @@ function mapVenue(row) {
 }
 
 function mapOffer(row) {
+  const availableDays = parseAvailableDays(row.available_days);
   return row
     ? {
         id: row.id,
@@ -191,6 +249,8 @@ function mapOffer(row) {
         startsAt: row.starts_at,
         endsAt: row.ends_at,
         isActive: Boolean(row.is_active),
+        availableDays,
+        availabilitySummary: formatAvailabilitySummary(availableDays),
         createdAt: row.created_at
       }
     : null;
@@ -288,9 +348,9 @@ const upsertVenueStmt = db.prepare(`
 
 const insertOfferStmt = db.prepare(`
   INSERT OR IGNORE INTO offers (
-    id, venue_id, title, description, image_url, starts_at, ends_at, is_active
+    id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days
   ) VALUES (
-    @id, @venueId, @title, @description, @imageUrl, @startsAt, @endsAt, @isActive
+    @id, @venueId, @title, @description, @imageUrl, @startsAt, @endsAt, @isActive, @availableDays
   )
 `);
 
@@ -316,7 +376,8 @@ const seedDb = db.transaction(() => {
   for (const offer of catalog.offers) {
     insertOfferStmt.run({
       ...offer,
-      isActive: offer.isActive ? 1 : 0
+      isActive: offer.isActive ? 1 : 0,
+      availableDays: serializeAvailableDays(offer.availableDays)
     });
   }
 });
@@ -387,6 +448,7 @@ const listActiveOffersStmt = db.prepare(`
     o.starts_at,
     o.ends_at,
     o.is_active,
+    o.available_days,
     o.created_at,
     v.id AS venue_id_join,
     v.source AS venue_source,
@@ -476,7 +538,7 @@ const clearVenueProfileStmt = db.prepare(`
 `);
 
 const listVenueActiveOffersStmt = db.prepare(`
-  SELECT id, venue_id, title, description, image_url, starts_at, ends_at, is_active, created_at
+  SELECT id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days, created_at
   FROM offers
   WHERE venue_id = ?
     AND is_active = 1
@@ -493,6 +555,7 @@ const listOffersStmt = db.prepare(`
     o.starts_at,
     o.ends_at,
     o.is_active,
+    o.available_days,
     o.created_at,
     COALESCE(v.display_name, v.name) AS venue_name
   FROM offers o
@@ -501,16 +564,16 @@ const listOffersStmt = db.prepare(`
 `);
 
 const findOfferByIdStmt = db.prepare(`
-  SELECT id, venue_id, title, description, image_url, starts_at, ends_at, is_active, created_at
+  SELECT id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days, created_at
   FROM offers
   WHERE id = ?
 `);
 
 const insertOfferRecordStmt = db.prepare(`
   INSERT INTO offers (
-    id, venue_id, title, description, image_url, starts_at, ends_at, is_active, created_at
+    id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days, created_at
   ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
   )
 `);
 
@@ -522,7 +585,7 @@ const updateOfferActiveStmt = db.prepare(`
 
 const updateOfferContentStmt = db.prepare(`
   UPDATE offers
-  SET title = ?, description = ?
+  SET title = ?, description = ?, available_days = ?
   WHERE id = ?
 `);
 
@@ -692,7 +755,13 @@ function getActiveOffers({ venueId = null, membershipToken = null } = {}) {
   const resetInfo = getWeeklyResetInfo();
   const offers = listActiveOffersStmt
     .all({ nowIso: nowIso(), venueId, enabledOnly: membershipToken ? 1 : 0 })
-    .map((row) => hydrateOfferRow(row));
+    .map((row) => {
+      const offer = hydrateOfferRow(row);
+      return {
+        ...offer,
+        ...getOfferAvailability(offer)
+      };
+    });
 
   if (!membershipToken) {
     return offers;
@@ -774,6 +843,7 @@ const createOfferTxn = db.transaction((offerInput) => {
     offerInput.startsAt,
     offerInput.endsAt,
     offerInput.isActive ? 1 : 0,
+    serializeAvailableDays(offerInput.availableDays),
     createdAt
   );
 
@@ -792,7 +862,10 @@ const createOfferTxn = db.transaction((offerInput) => {
 
   return {
     ok: true,
-    offer: mapOffer(findOfferByIdStmt.get(offerInput.id))
+    offer: {
+      ...mapOffer(findOfferByIdStmt.get(offerInput.id)),
+      ...getOfferAvailability(mapOffer(findOfferByIdStmt.get(offerInput.id)))
+    }
   };
 });
 
@@ -805,7 +878,13 @@ function getVenueOffers(venueId, membershipToken = null) {
 
   const offers = listVenueActiveOffersStmt
     .all(venueId)
-    .map((row) => mapOffer(row));
+    .map((row) => {
+      const offer = mapOffer(row);
+      return {
+        ...offer,
+        ...getOfferAvailability(offer)
+      };
+    });
 
   if (!membershipToken) {
     return { venue, offers };
@@ -890,6 +969,20 @@ const redeemTxn = db.transaction(({ membershipToken, offerId, venueId, staffId, 
       reason: "offer_inactive"
     });
     return { ok: false, statusCode: 400, reason: "offer_inactive" };
+  }
+
+  if (!getOfferAvailability(offer).isAvailableToday) {
+    logRedemptionEvent({
+      memberId: membership.memberId,
+      membershipToken,
+      offerId,
+      venueId,
+      staffId,
+      deviceId,
+      result: "denied",
+      reason: "offer_unavailable_today"
+    });
+    return { ok: false, statusCode: 400, reason: "offer_unavailable_today" };
   }
 
   const entitlement = normalizeEntitlement(
@@ -990,6 +1083,7 @@ function listRedemptions() {
 function listOffers() {
   return listOffersStmt.all().map((row) => ({
     ...mapOffer(row),
+    ...getOfferAvailability(mapOffer(row)),
     venueName: row.venue_name
   }));
 }
@@ -1120,17 +1214,20 @@ function setOfferActive(offerId, isActive) {
   };
 }
 
-function updateOfferContent(offerId, { title, description }) {
+function updateOfferContent(offerId, { title, description, availableDays }) {
   const offer = mapOffer(findOfferByIdStmt.get(offerId));
   if (!offer) {
     return { ok: false, statusCode: 404, reason: "offer_not_found" };
   }
 
-  updateOfferContentStmt.run(title, description ?? null, offerId);
+  updateOfferContentStmt.run(title, description ?? null, serializeAvailableDays(availableDays), offerId);
 
   return {
     ok: true,
-    offer: mapOffer(findOfferByIdStmt.get(offerId))
+    offer: {
+      ...mapOffer(findOfferByIdStmt.get(offerId)),
+      ...getOfferAvailability(mapOffer(findOfferByIdStmt.get(offerId)))
+    }
   };
 }
 

@@ -183,6 +183,10 @@ function getWeeklyResetLabel(weeklyReset) {
   return weeklyReset?.label || "Resets every Sunday at 12:00 AM Austin time";
 }
 
+function getOfferAvailabilitySummary(offer) {
+  return offer?.availabilitySummary || "Every day";
+}
+
 function venueFallbackMarkup(label, sizeClass = "") {
   const initial = escapeHtml(String(label || "DBC").charAt(0).toUpperCase() || "D");
   return `
@@ -357,9 +361,12 @@ async function handleLogin(event) {
 
 function statusPill(offer) {
   if (offer.entitlementStatus === "redeemed") {
-    return `<span class="status-pill status-redeemed">Redeemed</span>`;
+    return `<span class="status-pill status-redeemed">Redeemed this week</span>`;
   }
-  return `<span class="status-pill status-live">Live offer</span>`;
+  if (!offer.isAvailableToday) {
+    return `<span class="status-pill status-muted">Scheduled</span>`;
+  }
+  return `<span class="status-pill status-live">Available today</span>`;
 }
 
 function venueSignal(venue) {
@@ -384,11 +391,16 @@ function chooseVenueOffer(currentOffer, nextOffer) {
     return nextOffer;
   }
 
-  const currentRedeemed = currentOffer.entitlementStatus === "redeemed";
-  const nextRedeemed = nextOffer.entitlementStatus === "redeemed";
+  const priority = (offer) => {
+    if (offer.entitlementStatus !== "redeemed" && offer.isAvailableToday) return 2;
+    if (offer.entitlementStatus !== "redeemed") return 1;
+    return 0;
+  };
 
-  if (currentRedeemed !== nextRedeemed) {
-    return currentRedeemed ? nextOffer : currentOffer;
+  const currentPriority = priority(currentOffer);
+  const nextPriority = priority(nextOffer);
+  if (currentPriority !== nextPriority) {
+    return nextPriority > currentPriority ? nextOffer : currentOffer;
   }
 
   const currentCreatedAt = Date.parse(currentOffer.createdAt || 0);
@@ -409,12 +421,14 @@ function getVenueCounts(offers) {
     (counts, offer) => {
       if (offer.entitlementStatus === "redeemed") {
         counts.redeemed += 1;
-      } else {
+      } else if (offer.isAvailableToday) {
         counts.live += 1;
+      } else {
+        counts.scheduled += 1;
       }
       return counts;
     },
-    { live: 0, redeemed: 0 }
+    { live: 0, scheduled: 0, redeemed: 0 }
   );
 }
 
@@ -477,13 +491,15 @@ async function renderVenueList() {
 
     venueGroups.forEach((group) => {
       group.offers.sort((a, b) => {
-        const aR = a.entitlementStatus === "redeemed" ? 1 : 0;
-        const bR = b.entitlementStatus === "redeemed" ? 1 : 0;
-        if (aR !== bR) return aR - bR;
+        const aScore = a.entitlementStatus !== "redeemed" && a.isAvailableToday ? 2 : a.entitlementStatus !== "redeemed" ? 1 : 0;
+        const bScore = b.entitlementStatus !== "redeemed" && b.isAvailableToday ? 2 : b.entitlementStatus !== "redeemed" ? 1 : 0;
+        if (aScore !== bScore) return bScore - aScore;
         return Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0);
       });
       group.primary = group.offers[0];
       group.allRedeemed = group.offers.every((o) => o.entitlementStatus === "redeemed");
+      group.hasRedeemableToday = group.offers.some((o) => o.entitlementStatus !== "redeemed" && o.isAvailableToday);
+      group.hasScheduledOnly = !group.hasRedeemableToday && group.offers.some((o) => o.entitlementStatus !== "redeemed");
     });
 
     venueGroups.sort((left, right) => {
@@ -491,6 +507,12 @@ async function renderVenueList() {
       const rightFeatured = right.venue.featured ? 1 : 0;
       if (leftFeatured !== rightFeatured) {
         return rightFeatured - leftFeatured;
+      }
+      if (left.hasRedeemableToday !== right.hasRedeemableToday) {
+        return left.hasRedeemableToday ? -1 : 1;
+      }
+      if (left.hasScheduledOnly !== right.hasScheduledOnly) {
+        return left.hasScheduledOnly ? -1 : 1;
       }
       if (left.allRedeemed !== right.allRedeemed) {
         return left.allRedeemed ? 1 : -1;
@@ -509,11 +531,14 @@ async function renderVenueList() {
         const metaParts = [
           venue.neighborhood || venue.city,
           venueSignal(venue),
-          priceLevelLabel(venue.priceLevel)
+          priceLevelLabel(venue.priceLevel),
+          primary.isAvailableToday ? "Today" : getOfferAvailabilitySummary(primary)
         ].filter(Boolean);
         const when = isRedeemed && primary.redeemedAt
           ? `Redeemed ${escapeHtml(formatDateTime(primary.redeemedAt))}`
-          : ``;
+          : !primary.isAvailableToday
+            ? `Available ${escapeHtml(getOfferAvailabilitySummary(primary))}`
+            : ``;
         const offerLine = extra > 0
           ? `${escapeHtml(primary.title)} <span class="offer-more">+${extra} more</span>`
           : escapeHtml(primary.title);
@@ -525,6 +550,7 @@ async function renderVenueList() {
               ${imageMarkup(primary.imageUrl || venue.imageUrl, venue.name || "Venue", "venue-card-image", venue.name || primary.title, "image-fallback-tall")}
               <div class="venue-media-gradient"></div>
               <div class="venue-media-copy">
+                ${statusPill(primary)}
                 <h3>${escapeHtml(venue.name || "Venue")}</h3>
                 <p>${offerLine}</p>
               </div>
@@ -542,15 +568,18 @@ async function renderVenueList() {
       })
       .join("");
 
-    const liveCount = venueGroups.filter((g) => !g.allRedeemed).length;
-    const counts = { live: liveCount, redeemed: venueGroups.length - liveCount };
+    const counts = {
+      live: venueGroups.filter((g) => g.hasRedeemableToday).length,
+      scheduled: venueGroups.filter((g) => g.hasScheduledOnly).length,
+      redeemed: venueGroups.filter((g) => g.allRedeemed).length
+    };
 
     render(
       shell(
         `
           <section class="member-summary">
             <div>
-              <h2>${counts.live ? "Pick a bar and unlock your member offer." : "Your redeemed venues are saved here."}</h2>
+              <h2>${counts.live ? "Pick a bar and unlock your member offer." : counts.scheduled ? "Your next specials are scheduled below." : "Your redeemed venues are saved here."}</h2>
               <div class="member-summary-note">${escapeHtml(weeklyResetLabel)}</div>
             </div>
             <div class="summary-pill">${venueGroups.length} ${venueGroups.length === 1 ? "venue" : "venues"}</div>
@@ -656,7 +685,7 @@ async function renderVenueDetail(venueId) {
       if (aR !== bR) return aR - bR;
       return Date.parse(b.endsAt || 0) - Date.parse(a.endsAt || 0);
     });
-    const hasLiveOffers = allOffers.some((o) => o.entitlementStatus !== "redeemed");
+    const hasLiveOffers = allOffers.some((o) => o.entitlementStatus !== "redeemed" && o.isAvailableToday);
     const mapsUrl = `https://maps.google.com/maps?q=${encodeURIComponent(venue.address || `${venue.name}, Austin, TX`)}`;
     const infoMarkup = buildDetailInfo(venue);
     const hoursMarkup = formatHoursSummary(venue.hoursSummary);
@@ -705,6 +734,13 @@ async function renderVenueDetail(venueId) {
               <span>${escapeHtml(when ? `Used ${when}. ${weeklyResetLabel}.` : weeklyResetLabel)}</span>
             </div>
           `;
+        } else if (!offer.isAvailableToday) {
+          ctaMarkup = `
+            <div class="info-banner muted-banner" style="margin-top:10px;">
+              <strong>Not available today</strong>
+              <span>${escapeHtml(`This special is only available on ${getOfferAvailabilitySummary(offer)}.`)}</span>
+            </div>
+          `;
         } else {
           ctaMarkup = `<button class="btn btn-primary redeem-offer-btn" data-offer-idx="${idx}" style="margin-top:10px;">Redeem now</button>`;
         }
@@ -714,6 +750,7 @@ async function renderVenueDetail(venueId) {
             <div class="section-kicker">${allOffers.length > 1 ? `Offer ${idx + 1} of ${allOffers.length}` : "Your offer"}</div>
             <div class="detail-offer-title">${escapeHtml(offer.title)}</div>
             ${offer.description ? `<div class="detail-offer-desc">${escapeHtml(offer.description)}</div>` : `<div class="detail-offer-desc">&nbsp;</div>`}
+            <div class="detail-window">${offer.isAvailableToday ? "Available today" : `Available on ${escapeHtml(getOfferAvailabilitySummary(offer))}`}</div>
             ${ctaMarkup}
           </section>
         `;
@@ -929,6 +966,8 @@ async function onGeoSuccess(position, venue, offer) {
     }
     if (reason === "offer_inactive") {
       message = "This offer is no longer live. Head back to the venue list to see the latest available offers.";
+    } else if (reason === "offer_unavailable_today") {
+      message = `This special is not available today. It is only available on ${getOfferAvailabilitySummary(offer)}.`;
     } else if (reason === "entitlement_missing") {
       message = "This offer is not available on your membership.";
     } else if (reason === "venue_mismatch") {

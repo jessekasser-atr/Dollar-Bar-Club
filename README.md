@@ -29,6 +29,7 @@ Dollar Bar Club is a BarGlance product. The public DBC experience sits on top of
 ## Product Goals
 
 - On-site drink redemption with once-per-week, per-offer validation
+- Per-offer weekday scheduling so bars can run specials only on selected days
 - Fast setup for Austin pilot bars
 - Basic internal operator/admin workflows
 - Clear audit trail of redemptions
@@ -152,6 +153,7 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 - Venue browsing and venue detail views
 - Geolocation-based redemption
 - Weekly offer resets every Sunday at `12:00 AM` Austin time
+- Offer availability states for `Available today`, `Scheduled`, and `Redeemed this week`
 - PWA installability
 - Shared codebase with the live iOS App Store release (via Capacitor)
 
@@ -160,7 +162,7 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 - Protected via shared admin access key
 - Used internally to update the content and state shown in the app
 - Venue curation and manual venue creation
-- Offer management
+- Offer management, including per-offer weekday scheduling
 - Member listing
 - Redemption reporting
 - Curated venue profile overrides
@@ -171,14 +173,15 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 - Venue and offer retrieval
 - Entitlement management
 - Weekly redemption enforcement per member, per offer, with Sunday-midnight Austin resets
+- Per-offer weekday availability enforcement using Austin local time
 - BarGlance API sync support for venue/bar population
 
 ## Pilot Redemption Flow
 
 1. Member opens the member app and claims a pass with email plus Austin ZIP, or signs in with email.
-2. Member browses enabled venues and selects an eligible live offer.
-3. Member taps "Redeem now" and the app verifies on-site presence via geolocation.
-4. The API validates active membership, active offer, and whether that offer has already been redeemed during the current Austin week.
+2. Member browses enabled venues and sees whether an offer is available today, scheduled for other days, or already redeemed this week.
+3. Member selects an eligible live offer and taps "Redeem now"; the app verifies on-site presence via geolocation.
+4. The API validates active membership, active offer, whether the offer is scheduled for the current Austin weekday, and whether that offer has already been redeemed during the current Austin week.
 5. The API records the redemption with venue and audit metadata, then keeps that offer locked until the next Sunday `12:00 AM` Austin reset.
 6. Member shows the confirmation screen to the bartender or server.
 
@@ -211,8 +214,8 @@ All admin routes require the `X-Admin-Key` header.
 | `POST` | `/admin/venues/:id/profile` | Update curated display overrides |
 | `POST` | `/admin/venues/:id/profile/reset` | Clear curated display overrides |
 | `GET` | `/admin/offers` | List all offers |
-| `POST` | `/offers` | Create offer and backfill entitlements |
-| `POST` | `/admin/offers/:id/content` | Update offer title and description |
+| `POST` | `/offers` | Create offer, optional weekday schedule, and backfill entitlements |
+| `POST` | `/admin/offers/:id/content` | Update offer title, description, and weekday schedule |
 | `POST` | `/admin/offers/:id/active` | Toggle offer active state |
 | `DELETE` | `/admin/offers/:id` | Delete offer and related entitlements |
 | `POST` | `/admin/sync/barglance` | Sync venues from BarGlance |
@@ -351,6 +354,9 @@ The iOS build and upload pipeline runs via GitHub Actions (`.github/workflows/io
   - Manual venues are stored locally and behave as fully curated records
 - Synced BarGlance venues are imported as disabled by default until explicitly enabled via the admin console. Re-syncing updates venue metadata without resetting the enabled/disabled state.
 - Entitlements: backfilled on signup, login, and offer creation
+- Offer schedules:
+  - No `availableDays` selected means the offer is available every day
+  - One or more selected weekdays means the offer is only available on those Austin weekdays
 
 ## Database
 

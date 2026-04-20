@@ -6,7 +6,7 @@
     "androidScheme": "https"
   },
   "ios": {
-    "contentInset": "automatic",
+    "contentInset": "never",
     "preferredContentMode": "mobile",
     "scheme": "Dollar Bar Club"
   },

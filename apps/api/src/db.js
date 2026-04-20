@@ -88,7 +88,7 @@ function getWeeklyResetInfo(referenceDate = new Date()) {
 
   return {
     timeZone: AUSTIN_TIME_ZONE,
-    label: "Resets every Sunday at 12:00 AM Austin time",
+    label: "Resets every Sunday at midnight",
     currentWeekStartAt: zonedMidnightToUtcIso(currentWeekYear, currentWeekMonth, currentWeekDay),
     nextResetAt: zonedMidnightToUtcIso(
       nextWeekDate.getUTCFullYear(),

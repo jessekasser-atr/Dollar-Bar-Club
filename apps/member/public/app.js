@@ -189,7 +189,7 @@ function formatDateTime(value) {
 }
 
 function getWeeklyResetLabel(weeklyReset) {
-  return weeklyReset?.label || "Resets every Sunday at 12:00 AM Austin time";
+  return weeklyReset?.label || "Resets every Sunday at midnight";
 }
 
 function getOfferAvailabilitySummary(offer) {
@@ -588,7 +588,7 @@ async function renderVenueList() {
         `
           <section class="member-summary">
             <div>
-              <h2>${counts.live ? "Pick a bar and unlock your member offer." : counts.scheduled ? "Your next specials are scheduled below." : "Your redeemed venues are saved here."}</h2>
+              <h2>${counts.live ? "Today's specials." : counts.scheduled ? "Upcoming specials." : "Redeemed this week."}</h2>
               <div class="member-summary-note">${escapeHtml(weeklyResetLabel)}</div>
             </div>
             <div class="summary-pill">${venueGroups.length} ${venueGroups.length === 1 ? "venue" : "venues"}</div>

@@ -3,6 +3,15 @@ function resolveApiBase() {
     return String(window.__DBC_API_BASE__).replace(/\/+$/, "");
   }
 
+  const isCapacitor =
+    typeof window !== "undefined" &&
+    window.Capacitor &&
+    window.Capacitor.isNativePlatform();
+
+  if (isCapacitor) {
+    return "https://dbc-api.onrender.com";
+  }
+
   const { protocol, hostname } = window.location;
   const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1";
   if (isLocalhost) {
@@ -180,7 +189,7 @@ function formatDateTime(value) {
 }
 
 function getWeeklyResetLabel(weeklyReset) {
-  return weeklyReset?.label || "Resets every Sunday at 12:00 AM Austin time";
+  return weeklyReset?.label || "Resets every Sunday at midnight";
 }
 
 function getOfferAvailabilitySummary(offer) {
@@ -579,7 +588,7 @@ async function renderVenueList() {
         `
           <section class="member-summary">
             <div>
-              <h2>${counts.live ? "Pick a bar and unlock your member offer." : counts.scheduled ? "Your next specials are scheduled below." : "Your redeemed venues are saved here."}</h2>
+              <h2>${counts.live ? "Today's specials." : counts.scheduled ? "Upcoming specials." : "Redeemed this week."}</h2>
               <div class="member-summary-note">${escapeHtml(weeklyResetLabel)}</div>
             </div>
             <div class="summary-pill">${venueGroups.length} ${venueGroups.length === 1 ? "venue" : "venues"}</div>
@@ -1038,9 +1047,13 @@ document.addEventListener("click", (event) => {
   }, { passive: true });
 })();
 
+if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+  document.documentElement.classList.add("native");
+}
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/app/service-worker.js", { scope: "/app/" }).catch(() => {
+    navigator.serviceWorker.register("/service-worker.js").catch(() => {
       // Keep the member flow functional even if offline support fails to register.
     });
   });

@@ -472,9 +472,12 @@
     }
 
     .member-summary h2 {
-      font-size: 24px;
-      line-height: 1.08;
+      font-size: 18px;
+      line-height: 1.2;
       color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .member-summary-note {
@@ -1071,10 +1074,13 @@
       }
 
       .welcome-card h2,
-      .member-summary h2,
       .detail-name,
       .detail-offer-title {
         font-size: 25px;
+      }
+
+      .member-summary h2 {
+        font-size: 17px;
       }
 
       .member-summary {

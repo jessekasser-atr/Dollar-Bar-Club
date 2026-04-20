@@ -61,11 +61,34 @@ function navigate(hash) {
 
 function getRoute() {
   const hash = window.location.hash || "#/";
-  const venueMatch = hash.match(/^#\/venue\/(.+)$/);
+  const [pathPart, queryPart] = hash.split("?");
+  const params = new URLSearchParams(queryPart || "");
+  const venueMatch = pathPart.match(/^#\/venue\/(.+)$/);
   if (venueMatch) {
     return { view: "venue", id: venueMatch[1] };
   }
-  return { view: "home" };
+  return { view: "home", query: params.get("q") || "" };
+}
+
+let searchQuery = "";
+let lastVenueGroups = [];
+
+function normalizeSearchQuery(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function filterVenueGroups(groups, query) {
+  const q = normalizeSearchQuery(query);
+  if (!q) return groups;
+  return groups.filter((group) => (group.venue?.name || "").toLowerCase().includes(q));
+}
+
+function updateSearchHash(query) {
+  const q = String(query || "").trim();
+  const base = "#/";
+  const next = q ? `${base}?q=${encodeURIComponent(q)}` : base;
+  if (window.location.hash === next || (!window.location.hash && next === base)) return;
+  history.replaceState(null, "", next);
 }
 
 const appEl = document.getElementById("app");
@@ -87,6 +110,32 @@ function bindShellActions() {
     navigate("#/");
     renderOnboarding();
   });
+
+  const searchInput = document.getElementById("search-input");
+  if (searchInput) {
+    searchInput.addEventListener("input", (event) => {
+      searchQuery = event.target.value;
+      updateSearchHash(searchQuery);
+      applyVenueSearch();
+    });
+    searchInput.addEventListener("focus", () => {
+      document.querySelector(".nav")?.classList.remove("nav-hidden");
+    });
+
+    document.getElementById("search-clear")?.addEventListener("click", () => {
+      searchQuery = "";
+      searchInput.value = "";
+      updateSearchHash("");
+      applyVenueSearch();
+      searchInput.focus();
+    });
+  }
+}
+
+function isSearchLocked() {
+  if (searchQuery && searchQuery.trim()) return true;
+  const active = document.activeElement;
+  return active && active.id === "search-input";
 }
 
 function closeMenu() {
@@ -118,7 +167,8 @@ function shell(content, options = {}) {
     title = "Dollar Bar Club",
     subtitle = "Members get first-drink pricing at a small set of Austin bars.",
     compact = false,
-    hideHero = false
+    hideHero = false,
+    showSearch = false
   } = options;
 
   const heroBlock = hideHero
@@ -131,6 +181,34 @@ function shell(content, options = {}) {
           <p>${subtitle}</p>
         </div>
       </header>`;
+
+  const searchRow = showSearch
+    ? `
+      <div class="search-row ${searchQuery ? "has-query" : ""}">
+        <div class="search-input-wrap">
+          <svg class="search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.5"></circle>
+            <path d="M10.5 10.5 L14 14" stroke-linecap="round"></path>
+          </svg>
+          <input
+            id="search-input"
+            class="search-input"
+            type="search"
+            inputmode="search"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            enterkeyhint="search"
+            placeholder="Search bars"
+            value="${escapeHtml(searchQuery)}"
+            aria-label="Search bars"
+          />
+          <button type="button" class="search-clear" id="search-clear" aria-label="Clear search">&times;</button>
+        </div>
+        <span class="search-count" id="search-count" aria-live="polite"></span>
+      </div>
+    `
+    : "";
 
   return `
     <div class="powered-by">
@@ -159,6 +237,7 @@ function shell(content, options = {}) {
             `
             : ""
         }
+        ${searchRow}
       </div>
       ${heroBlock}
       <main class="main wrap ${hideHero ? "main-no-hero" : ""}">${content}</main>
@@ -441,6 +520,91 @@ function getVenueCounts(offers) {
   );
 }
 
+function renderVenueCardsHtml(groups) {
+  return groups
+    .map((group) => {
+      const venue = group.venue;
+      const primary = group.primary;
+      const extra = group.offers.length - 1;
+      const isRedeemed = group.allRedeemed;
+      const isFeatured = venue.featured && !isRedeemed;
+      const cardClass = `venue-card${isRedeemed ? " is-redeemed" : ""}${isFeatured ? " is-featured" : ""}`;
+      const metaParts = [
+        venue.neighborhood || venue.city,
+        venueSignal(venue),
+        priceLevelLabel(venue.priceLevel),
+        primary.isAvailableToday ? "Today" : getOfferAvailabilitySummary(primary)
+      ].filter(Boolean);
+      const when = isRedeemed && primary.redeemedAt
+        ? `Redeemed ${escapeHtml(formatDateTime(primary.redeemedAt))}`
+        : !primary.isAvailableToday
+          ? `Available ${escapeHtml(getOfferAvailabilitySummary(primary))}`
+          : ``;
+      const offerLine = extra > 0
+        ? `${escapeHtml(primary.title)} <span class="offer-more">+${extra} more</span>`
+        : escapeHtml(primary.title);
+
+      return `
+        <a class="${cardClass}" href="#/venue/${escapeHtml(venue.id || "")}" data-venue-id="${escapeHtml(venue.id || "")}">
+          <div class="venue-media">
+            ${isFeatured ? '<span class="featured-star">⭐</span>' : ""}
+            ${imageMarkup(primary.imageUrl || venue.imageUrl, venue.name || "Venue", "venue-card-image", venue.name || primary.title, "image-fallback-tall")}
+            <div class="venue-media-gradient"></div>
+            <div class="venue-media-copy">
+              ${statusPill(primary)}
+              <h3>${escapeHtml(venue.name || "Venue")}</h3>
+              <p>${offerLine}</p>
+            </div>
+          </div>
+          <div class="venue-card-body">
+            <div class="venue-card-meta">${escapeHtml(metaParts.join(" | "))}</div>
+            <div class="venue-card-footer">
+              <div class="venue-card-address">${escapeHtml(venue.address || "Austin, TX")}</div>
+              <div class="venue-card-arrow">${isRedeemed ? "Details" : "View"}</div>
+            </div>
+            ${when ? `<div class="venue-meta">${when}</div>` : ""}
+          </div>
+        </a>
+      `;
+    })
+    .join("");
+}
+
+function renderSearchEmptyHtml(query) {
+  return `
+    <div class="search-empty">
+      No bars match <strong>${escapeHtml(query)}</strong>.
+    </div>
+  `;
+}
+
+function updateSearchCountLabel(matchCount, totalCount) {
+  const el = document.getElementById("search-count");
+  if (!el) return;
+  const isSearching = !!normalizeSearchQuery(searchQuery);
+  const n = isSearching ? matchCount : totalCount;
+  const full = isSearching
+    ? (n === 0 ? "No matches" : `${n} ${n === 1 ? "match" : "matches"}`)
+    : `${n} ${n === 1 ? "venue" : "venues"}`;
+  const short = isSearching ? `${n}` : `${n}`;
+  el.innerHTML = `<span class="search-count-full">${escapeHtml(full)}</span><span class="search-count-short">${escapeHtml(short)}</span>`;
+}
+
+function applyVenueSearch() {
+  const list = document.getElementById("venue-list");
+  const row = document.querySelector(".search-row");
+  if (row) row.classList.toggle("has-query", !!normalizeSearchQuery(searchQuery));
+  if (!list) return;
+
+  const filtered = filterVenueGroups(lastVenueGroups, searchQuery);
+  if (filtered.length === 0 && normalizeSearchQuery(searchQuery)) {
+    list.innerHTML = renderSearchEmptyHtml(searchQuery.trim());
+  } else {
+    list.innerHTML = renderVenueCardsHtml(filtered);
+  }
+  updateSearchCountLabel(filtered.length, lastVenueGroups.length);
+}
+
 async function renderVenueList() {
   const token = getToken();
   if (!token) {
@@ -448,12 +612,16 @@ async function renderVenueList() {
     return;
   }
 
+  const route = getRoute();
+  if (route.view === "home") {
+    searchQuery = route.query || "";
+  }
+
   render(shell('<div class="loading-block">Loading nearby pilot offers...</div>', { compact: true, hideHero: true }));
 
   try {
     const data = await api("GET", `/offers/active?membershipToken=${encodeURIComponent(token)}`);
     const offers = (data.offers || []).slice();
-    const weeklyResetLabel = getWeeklyResetLabel(data.weeklyReset);
 
     offers.sort((left, right) => {
       if (left.entitlementStatus === "redeemed" && right.entitlementStatus !== "redeemed") {
@@ -529,75 +697,21 @@ async function renderVenueList() {
       return (left.venue.name || "").localeCompare(right.venue.name || "");
     });
 
-    const cards = venueGroups
-      .map((group) => {
-        const venue = group.venue;
-        const primary = group.primary;
-        const extra = group.offers.length - 1;
-        const isRedeemed = group.allRedeemed;
-        const isFeatured = venue.featured && !isRedeemed;
-        const cardClass = `venue-card${isRedeemed ? " is-redeemed" : ""}${isFeatured ? " is-featured" : ""}`;
-        const metaParts = [
-          venue.neighborhood || venue.city,
-          venueSignal(venue),
-          priceLevelLabel(venue.priceLevel),
-          primary.isAvailableToday ? "Today" : getOfferAvailabilitySummary(primary)
-        ].filter(Boolean);
-        const when = isRedeemed && primary.redeemedAt
-          ? `Redeemed ${escapeHtml(formatDateTime(primary.redeemedAt))}`
-          : !primary.isAvailableToday
-            ? `Available ${escapeHtml(getOfferAvailabilitySummary(primary))}`
-            : ``;
-        const offerLine = extra > 0
-          ? `${escapeHtml(primary.title)} <span class="offer-more">+${extra} more</span>`
-          : escapeHtml(primary.title);
-
-        return `
-          <a class="${cardClass}" href="#/venue/${escapeHtml(venue.id || "")}" data-venue-id="${escapeHtml(venue.id || "")}">
-            <div class="venue-media">
-              ${isFeatured ? '<span class="featured-star">⭐</span>' : ""}
-              ${imageMarkup(primary.imageUrl || venue.imageUrl, venue.name || "Venue", "venue-card-image", venue.name || primary.title, "image-fallback-tall")}
-              <div class="venue-media-gradient"></div>
-              <div class="venue-media-copy">
-                ${statusPill(primary)}
-                <h3>${escapeHtml(venue.name || "Venue")}</h3>
-                <p>${offerLine}</p>
-              </div>
-            </div>
-            <div class="venue-card-body">
-              <div class="venue-card-meta">${escapeHtml(metaParts.join(" | "))}</div>
-              <div class="venue-card-footer">
-                <div class="venue-card-address">${escapeHtml(venue.address || "Austin, TX")}</div>
-                <div class="venue-card-arrow">${isRedeemed ? "Details" : "View"}</div>
-              </div>
-              ${when ? `<div class="venue-meta">${when}</div>` : ""}
-            </div>
-          </a>
-        `;
-      })
-      .join("");
-
-    const counts = {
-      live: venueGroups.filter((g) => g.hasRedeemableToday).length,
-      scheduled: venueGroups.filter((g) => g.hasScheduledOnly).length,
-      redeemed: venueGroups.filter((g) => g.allRedeemed).length
-    };
+    lastVenueGroups = venueGroups;
+    const filtered = filterVenueGroups(venueGroups, searchQuery);
+    const hasQuery = !!normalizeSearchQuery(searchQuery);
+    const listContents = filtered.length === 0 && hasQuery
+      ? renderSearchEmptyHtml(searchQuery.trim())
+      : renderVenueCardsHtml(filtered);
 
     render(
       shell(
-        `
-          <section class="member-summary">
-            <div>
-              <h2>${counts.live ? "Today's specials." : counts.scheduled ? "Upcoming specials." : "Redeemed this week."}</h2>
-              <div class="member-summary-note">${escapeHtml(weeklyResetLabel)}</div>
-            </div>
-            <div class="summary-pill">${venueGroups.length} ${venueGroups.length === 1 ? "venue" : "venues"}</div>
-          </section>
-          <section class="venue-list">${cards}</section>
-        `,
-        { compact: true, hideHero: true }
+        `<section class="venue-list" id="venue-list">${listContents}</section>`,
+        { compact: true, hideHero: true, showSearch: true }
       )
     );
+
+    updateSearchCountLabel(filtered.length, venueGroups.length);
   } catch (error) {
     if (error.data?.reason === "membership_not_found") {
       clearToken();
@@ -1039,7 +1153,9 @@ document.addEventListener("click", (event) => {
 
     const currentScrollY = window.scrollY;
     if (currentScrollY > lastScrollY && currentScrollY > scrollThreshold) {
-      nav.classList.add("nav-hidden");
+      if (!isSearchLocked()) {
+        nav.classList.add("nav-hidden");
+      }
     } else if (currentScrollY < lastScrollY) {
       nav.classList.remove("nav-hidden");
     }

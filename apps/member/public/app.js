@@ -121,6 +121,12 @@ function bindShellActions() {
     searchInput.addEventListener("focus", () => {
       document.querySelector(".nav")?.classList.remove("nav-hidden");
     });
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        searchInput.blur();
+      }
+    });
 
     document.getElementById("search-clear")?.addEventListener("click", () => {
       searchQuery = "";
@@ -583,10 +589,8 @@ function updateSearchCountLabel(matchCount, totalCount) {
   if (!el) return;
   const isSearching = !!normalizeSearchQuery(searchQuery);
   const n = isSearching ? matchCount : totalCount;
-  const full = isSearching
-    ? (n === 0 ? "No matches" : `${n} ${n === 1 ? "match" : "matches"}`)
-    : `${n} ${n === 1 ? "bar" : "bars"}`;
-  const short = isSearching ? `${n}` : `${n}`;
+  const full = n === 0 && isSearching ? "No bars" : `${n} ${n === 1 ? "bar" : "bars"}`;
+  const short = `${n}`;
   el.innerHTML = `<span class="search-count-full">${escapeHtml(full)}</span><span class="search-count-short">${escapeHtml(short)}</span>`;
 }
 

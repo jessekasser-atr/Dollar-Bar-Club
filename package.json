@@ -10,6 +10,7 @@
     "dev:web": "npm run dev -w @dbc/web",
     "dev:api": "npm run dev -w @dbc/api",
     "dev:member": "npm run dev -w @dbc/member",
-    "start": "npm run start -w @dbc/api"
+    "start": "npm run start -w @dbc/api",
+    "sync:app": "node scripts/sync-app.mjs"
   }
 }

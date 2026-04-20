@@ -61,7 +61,29 @@ Important deployment detail:
 - `website/app/` is the Vercel-served copy of the member app.
 - `website/admin/` is the Vercel-served copy of the admin console.
 - `apps/member/public/` and `apps/web/public/` are the working source directories used in local development.
-- When frontend source changes need to go live on Vercel, the corresponding files must still be copied into `website/app/` or `website/admin/`.
+- When frontend source changes need to go live on Vercel, the corresponding files must be synced into `website/app/` (member app) or `website/admin/` (admin console) before pushing.
+
+### Member app: use `npm run sync:app`
+
+Do **not** hand-copy `apps/member/public/` into `website/app/`. The two files are **not identical** — the deployed copy needs absolute URLs prefixed with `/app/` (e.g. `/app/app.js`, `/app/manifest.json`, `/app/icons/...`) because Vercel serves `website/app/` under `/app/...`, whereas the local dev server serves `apps/member/public/` at the root. Hand-mirroring flattens those paths and produces a blank screen in production.
+
+Run this before committing any member app change:
+
+```bash
+npm run sync:app
+```
+
+It:
+
+1. Clean-copies `apps/member/public/` into `website/app/`.
+2. Rewrites root-relative URLs in `index.html` to include the `/app/` prefix.
+3. Stamps the service worker's `CACHE_NAME` with the current git short SHA so returning PWA users pick up the new build instead of hanging on stale cached assets.
+
+Commit both the source change and the resulting `website/app/` diff in the same commit.
+
+### Admin console: still hand-mirrored (for now)
+
+`apps/web/public/` → `website/admin/` does not yet have a sync script. The two diverge on more than just URL prefixes (e.g. `favicon.svg` exists only in the deployed copy, and file names differ). When touching the admin console, mirror changes manually and spot-check `website/admin/index.html` for correct `/admin/`-prefixed paths. A future cleanup will give admin the same treatment as the member app.
 
 ## Project Structure
 
@@ -104,7 +126,8 @@ Important deployment detail:
 │   └── ios-ci-setup.md       iOS CI/build setup notes
 ├── certs/                    iOS code signing certificates and App Store Connect key
 ├── scripts/
-│   └── generate_icons.py     Icon generation script for iOS asset catalog
+│   ├── generate_icons.py     Icon generation script for iOS asset catalog
+│   └── sync-app.mjs          Mirrors apps/member/public/ -> website/app/ with path rewriting + SW cache bump
 ├── .github/
 │   └── workflows/
 │       └── ios-build.yml     GitHub Actions CI/CD pipeline for iOS builds
@@ -315,8 +338,8 @@ Managed in Vercel project settings. The serverless functions in `website/api/` u
 |---|---|
 | Marketing site or website form flows | Push to `main` -> Vercel auto-deploys |
 | API code in `apps/api/` | Push to `main` -> Manual Deploy in Render dashboard (no auto-deploy) |
-| Member app source in `apps/member/public/` | Copy to `website/app/` before pushing live web changes |
-| Admin console source in `apps/web/public/` | Copy to `website/admin/` before pushing live web changes |
+| Member app source in `apps/member/public/` | Run `npm run sync:app`, commit both source and `website/app/` changes, push to `main` |
+| Admin console source in `apps/web/public/` | Hand-mirror to `website/admin/` (preserve `/admin/`-prefixed paths and existing favicon), commit both, push to `main` |
 | iOS app update | Update `apps/member/`, push to `main`, then run the iOS Build workflow in GitHub Actions to build and upload to App Store Connect |
 
 ## iOS CI/CD

@@ -1,10 +1,10 @@
-const CACHE_NAME = "dbc-member-shell-v1";
+const CACHE_NAME = "dbc-member-shell-ddce4a9";
 const SHELL_ASSETS = [
-  "/app/",
-  "/app/index.html",
-  "/app/app.js",
-  "/app/manifest.json",
-  "/app/icons/icon.svg"
+  "/",
+  "/index.html",
+  "/app.js",
+  "/manifest.json",
+  "/icons/icon.svg"
 ];
 
 self.addEventListener("install", (event) => {
@@ -40,7 +40,7 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(() => caches.match("/app/index.html"))
+      fetch(request).catch(() => caches.match("/index.html"))
     );
     return;
   }

@@ -585,7 +585,7 @@ function updateSearchCountLabel(matchCount, totalCount) {
   const n = isSearching ? matchCount : totalCount;
   const full = isSearching
     ? (n === 0 ? "No matches" : `${n} ${n === 1 ? "match" : "matches"}`)
-    : `${n} ${n === 1 ? "venue" : "venues"}`;
+    : `${n} ${n === 1 ? "bar" : "bars"}`;
   const short = isSearching ? `${n}` : `${n}`;
   el.innerHTML = `<span class="search-count-full">${escapeHtml(full)}</span><span class="search-count-short">${escapeHtml(short)}</span>`;
 }

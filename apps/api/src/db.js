@@ -589,6 +589,24 @@ const updateOfferContentStmt = db.prepare(`
   WHERE id = ?
 `);
 
+const updateOfferScheduleStmt = db.prepare(`
+  UPDATE offers
+  SET starts_at = ?, ends_at = ?
+  WHERE id = ?
+`);
+
+const extendExpiredOffersStmt = db.prepare(`
+  UPDATE offers
+  SET ends_at = ?
+  WHERE is_active = 1 AND ends_at < ?
+`);
+
+const listExpiredActiveOffersStmt = db.prepare(`
+  SELECT id, venue_id, title, ends_at
+  FROM offers
+  WHERE is_active = 1 AND ends_at < ?
+`);
+
 const listMemberIdsStmt = db.prepare("SELECT id FROM members");
 const listMembersStmt = db.prepare(`
   SELECT m.id, m.email, m.zip_code, m.first_name, m.last_name, m.created_at,
@@ -1214,7 +1232,7 @@ function setOfferActive(offerId, isActive) {
   };
 }
 
-function updateOfferContent(offerId, { title, description, availableDays }) {
+function updateOfferContent(offerId, { title, description, availableDays, startsAt, endsAt }) {
   const offer = mapOffer(findOfferByIdStmt.get(offerId));
   if (!offer) {
     return { ok: false, statusCode: 404, reason: "offer_not_found" };
@@ -1222,12 +1240,44 @@ function updateOfferContent(offerId, { title, description, availableDays }) {
 
   updateOfferContentStmt.run(title, description ?? null, serializeAvailableDays(availableDays), offerId);
 
+  const shouldUpdateSchedule = startsAt !== undefined || endsAt !== undefined;
+  if (shouldUpdateSchedule) {
+    const nextStart = startsAt !== undefined && startsAt !== null ? startsAt : offer.startsAt;
+    const nextEnd = endsAt !== undefined && endsAt !== null ? endsAt : offer.endsAt;
+    updateOfferScheduleStmt.run(nextStart, nextEnd, offerId);
+  }
+
   return {
     ok: true,
     offer: {
       ...mapOffer(findOfferByIdStmt.get(offerId)),
       ...getOfferAvailability(mapOffer(findOfferByIdStmt.get(offerId)))
     }
+  };
+}
+
+const FAR_FUTURE_ENDS_AT = "2099-12-31T23:59:59.000Z";
+
+function extendExpiredOffers(endsAtOverride = FAR_FUTURE_ENDS_AT) {
+  const now = nowIso();
+  const expired = listExpiredActiveOffersStmt.all(now).map((row) => ({
+    id: row.id,
+    venueId: row.venue_id,
+    title: row.title,
+    previousEndsAt: row.ends_at
+  }));
+
+  if (expired.length === 0) {
+    return { ok: true, updated: 0, offers: [], endsAt: endsAtOverride };
+  }
+
+  const info = extendExpiredOffersStmt.run(endsAtOverride, now);
+
+  return {
+    ok: true,
+    updated: info.changes,
+    offers: expired,
+    endsAt: endsAtOverride
   };
 }
 
@@ -1340,6 +1390,7 @@ export {
   clearVenueProfile,
   setOfferActive,
   updateOfferContent,
+  extendExpiredOffers,
   setVenueEnabled,
   setVenueFeatured,
   syncBarglanceCity,

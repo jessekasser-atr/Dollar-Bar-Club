@@ -20,6 +20,7 @@ import {
   redeemOffer,
   setOfferActive,
   updateOfferContent,
+  extendExpiredOffers,
   setVenueEnabled,
   setVenueFeatured,
   syncBarglanceCity,
@@ -320,23 +321,66 @@ app.post("/admin/offers/:id/active", requireAdminAccess, (req, res) => {
   return res.json(result);
 });
 
+function parseDateInput(value, fieldName) {
+  if (value === undefined) {
+    return { ok: true, value: undefined };
+  }
+  if (value === null || value === "") {
+    return { ok: true, value: null };
+  }
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) {
+    return { ok: false, reason: `${fieldName}_invalid` };
+  }
+  return { ok: true, value: new Date(ms).toISOString() };
+}
+
 app.post("/admin/offers/:id/content", requireAdminAccess, (req, res) => {
-  const { title, description, availableDays } = req.body || {};
+  const { title, description, availableDays, startsAt, endsAt } = req.body || {};
 
   if (!title || typeof title !== "string" || !title.trim()) {
     return res.status(400).json({ ok: false, reason: "title_required" });
   }
 
+  const parsedStart = parseDateInput(startsAt, "startsAt");
+  if (!parsedStart.ok) {
+    return res.status(400).json({ ok: false, reason: parsedStart.reason });
+  }
+  const parsedEnd = parseDateInput(endsAt, "endsAt");
+  if (!parsedEnd.ok) {
+    return res.status(400).json({ ok: false, reason: parsedEnd.reason });
+  }
+
+  if (
+    parsedStart.value && parsedEnd.value &&
+    Date.parse(parsedEnd.value) < Date.parse(parsedStart.value)
+  ) {
+    return res.status(400).json({ ok: false, reason: "ends_before_starts" });
+  }
+
   const result = updateOfferContent(req.params.id, {
     title: title.trim(),
     description: description != null ? String(description).trim() || null : null,
-    availableDays: normalizeAvailableDays(availableDays)
+    availableDays: normalizeAvailableDays(availableDays),
+    startsAt: parsedStart.value,
+    endsAt: parsedEnd.value
   });
 
   if (!result.ok) {
     return res.status(result.statusCode).json({ ok: false, reason: result.reason });
   }
 
+  return res.json(result);
+});
+
+app.post("/admin/offers/extend-expired", requireAdminAccess, (req, res) => {
+  const { endsAt } = req.body || {};
+  const parsedEnd = parseDateInput(endsAt, "endsAt");
+  if (!parsedEnd.ok) {
+    return res.status(400).json({ ok: false, reason: parsedEnd.reason });
+  }
+
+  const result = extendExpiredOffers(parsedEnd.value || undefined);
   return res.json(result);
 });
 

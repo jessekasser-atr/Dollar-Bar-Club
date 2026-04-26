@@ -118,6 +118,7 @@ function renderOpsApp() {
     syncStatusEl: document.getElementById("syncStatus"),
     createOfferBtn: document.getElementById("createOfferBtn"),
     loadAdminOffersBtn: document.getElementById("loadAdminOffersBtn"),
+    extendExpiredOffersBtn: document.getElementById("extendExpiredOffersBtn"),
     offerAdminListEl: document.getElementById("offerAdminList"),
     offerAdminSummaryEl: document.getElementById("offerAdminSummary"),
     offerSearchEl: document.getElementById("offerSearch"),
@@ -448,13 +449,22 @@ function venueAdminCard(venue) {
   return wrap;
 }
 
+function isOfferExpired(offer) {
+  const endsAtMs = offer.endsAt ? Date.parse(offer.endsAt) : Number.NaN;
+  return Number.isFinite(endsAtMs) && endsAtMs < Date.now();
+}
+
 function offerAdminCard(offer) {
   const wrap = document.createElement("div");
   wrap.className = "offer";
+  const expired = isOfferExpired(offer);
+  const scheduledPill = expired
+    ? `<span class="pill" style="background:#fde2e2;color:#c62828;">Expired ${escapeHtml(offer.endsAt ? new Date(offer.endsAt).toLocaleDateString() : "")}</span>`
+    : `<span class="pill pill-accent">${escapeHtml(offer.isAvailableToday ? "Available Today" : "Scheduled")}</span>`;
   wrap.innerHTML = `
     <div class="pill-row">
       <span class="pill ${offer.isActive ? "pill-ok" : "pill-muted"}">${offer.isActive ? "Active" : "Inactive"}</span>
-      <span class="pill pill-accent">${escapeHtml(offer.isAvailableToday ? "Available Today" : "Scheduled")}</span>
+      ${scheduledPill}
     </div>
     <h3>${escapeHtml(offer.title)}</h3>
     <p>${escapeHtml(offer.description || "")}</p>
@@ -464,7 +474,9 @@ function offerAdminCard(offer) {
       <strong>Status:</strong> ${offer.isActive ? "active" : "inactive"}
     </p>
     <p style="margin-top:6px;color:#5c6675;">
-      <strong>Available:</strong> ${escapeHtml(formatOfferSchedule(offer))}
+      <strong>Available:</strong> ${escapeHtml(formatOfferSchedule(offer))} |
+      <strong>Window:</strong> ${escapeHtml(offer.startsAt ? new Date(offer.startsAt).toLocaleDateString() : "—")}
+      &rarr; ${escapeHtml(offer.endsAt ? new Date(offer.endsAt).toLocaleDateString() : "—")}
     </p>
   `;
 
@@ -496,10 +508,50 @@ function offerAdminCard(offer) {
     const daySelector = buildDaySelector(offer.availableDays || []);
     daySelector.style.marginBottom = "6px";
 
+    const windowLabel = document.createElement("div");
+    windowLabel.textContent = "Active window (local time)";
+    windowLabel.style.cssText = "margin:8px 0 6px;font-size:12px;font-weight:600;color:#5c6675;";
+
+    const windowRow = document.createElement("div");
+    windowRow.style.cssText = "display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;";
+
+    const toDatetimeLocal = (isoString) => {
+      if (!isoString) return "";
+      const d = new Date(isoString);
+      if (Number.isNaN(d.getTime())) return "";
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    const startsInput = document.createElement("input");
+    startsInput.type = "datetime-local";
+    startsInput.value = toDatetimeLocal(offer.startsAt);
+    startsInput.style.cssText = "flex:1;min-width:180px;padding:4px 6px;";
+
+    const endsInput = document.createElement("input");
+    endsInput.type = "datetime-local";
+    endsInput.value = toDatetimeLocal(offer.endsAt);
+    endsInput.style.cssText = "flex:1;min-width:180px;padding:4px 6px;";
+
+    const neverExpireBtn = document.createElement("button");
+    neverExpireBtn.type = "button";
+    neverExpireBtn.className = "secondary";
+    neverExpireBtn.textContent = "Never expires";
+    neverExpireBtn.style.cssText = "font-size:12px;padding:4px 8px;";
+    neverExpireBtn.addEventListener("click", () => {
+      endsInput.value = toDatetimeLocal("2099-12-31T23:59:59.000Z");
+    });
+
+    windowRow.appendChild(startsInput);
+    windowRow.appendChild(endsInput);
+    windowRow.appendChild(neverExpireBtn);
+
     titleEl.replaceWith(titleInput);
     descEl.replaceWith(descInput);
     descInput.insertAdjacentElement("afterend", daySelector);
     daySelector.insertAdjacentElement("beforebegin", scheduleLabel);
+    daySelector.insertAdjacentElement("afterend", windowRow);
+    windowRow.insertAdjacentElement("beforebegin", windowLabel);
     titleInput.focus();
 
     editBtn.textContent = "Save";
@@ -517,13 +569,17 @@ function offerAdminCard(offer) {
       editBtn.disabled = true;
       cancelBtn.disabled = true;
       try {
+        const startsAtIso = startsInput.value ? new Date(startsInput.value).toISOString() : null;
+        const endsAtIso = endsInput.value ? new Date(endsInput.value).toISOString() : null;
         const data = await jsonFetch(`/admin/offers/${encodeURIComponent(offer.id)}/content`, {
           method: "POST",
           headers: getAdminHeaders(),
           body: JSON.stringify({
             title: newTitle,
             description: descInput.value.trim() || null,
-            availableDays: getCheckedDays(daySelector)
+            availableDays: getCheckedDays(daySelector),
+            startsAt: startsAtIso,
+            endsAt: endsAtIso
           })
         });
         renderResult(true, data);
@@ -860,6 +916,29 @@ function bindEvents() {
   ui.venueSearchEl.addEventListener("input", renderVenueAdminList);
   ui.venueFilterEl.addEventListener("input", renderVenueAdminList);
   ui.loadAdminOffersBtn.addEventListener("click", loadAdminOffers);
+  if (ui.extendExpiredOffersBtn) {
+    ui.extendExpiredOffersBtn.addEventListener("click", async () => {
+      const expiredCount = (allAdminOffers || []).filter((offer) => offer.isActive && isOfferExpired(offer)).length;
+      const message = expiredCount > 0
+        ? `Extend ${expiredCount} expired active offer${expiredCount === 1 ? "" : "s"} to 2099-12-31? This will make them available today.`
+        : "No expired active offers were found on the last refresh. Extend anything that expires before now on the server?";
+      if (!confirm(message)) return;
+      ui.extendExpiredOffersBtn.disabled = true;
+      try {
+        const data = await jsonFetch("/admin/offers/extend-expired", {
+          method: "POST",
+          headers: getAdminHeaders(),
+          body: JSON.stringify({})
+        });
+        renderResult(true, data);
+        await loadAdminOffers();
+      } catch (error) {
+        renderResult(false, { ok: false, reason: "extend_expired_failed", error: String(error) });
+      } finally {
+        ui.extendExpiredOffersBtn.disabled = false;
+      }
+    });
+  }
   ui.offerSearchEl.addEventListener("input", renderAdminOffers);
   ui.offerFilterEl.addEventListener("input", renderAdminOffers);
   ui.loadRedemptionsBtn.addEventListener("click", loadRedemptionList);

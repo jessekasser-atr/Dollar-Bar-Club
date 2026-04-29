@@ -184,7 +184,6 @@
 
       .hero-photo {
         border-radius: 24px;
-        border: 1px solid var(--border);
         min-height: 360px;
         pointer-events: none;
         background: #000 url("hero-2.png") center/cover;
@@ -339,13 +338,27 @@
           display: none;
         }
 
+        .hero .primary-btn {
+          padding: 14px 24px;
+          font-size: 16px;
+        }
+
         .primary-btn {
           width: auto;
           text-align: center;
         }
 
         .hero-cta {
+          flex-direction: column;
+          align-items: center;
           justify-content: center;
+          gap: 14px;
+        }
+
+        .hero-subcta {
+          width: 100%;
+          text-align: center;
+          margin-top: 20px;
         }
 
         .logo {
@@ -356,10 +369,6 @@
           font-size: 15px;
         }
 
-        .hero-subcta {
-          width: 100%;
-          text-align: center;
-        }
       }
 
       .powered-by {

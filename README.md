@@ -403,10 +403,12 @@ The iOS build and upload pipeline runs via GitHub Actions (`.github/workflows/io
 Phase 1 is iOS-only and manually triggered from the admin console. No scheduling, no automation, no web push.
 
 ### How it works
-- On first signup/login, the iOS app prompts for push permission. A toggle in the menu lets members opt in/out anytime.
-- Granted device tokens are registered via `POST /memberships/devices` and stored in `member_devices`.
+- After a successful signup or login, the iOS app shows a custom soft prompt ("Want us to let you know when new drink specials are added?"). Tapping "Yes, notify me" then triggers the locked iOS system permission alert. The soft prompt is shown at most once per device — outcome is tracked in localStorage (`dbc_pushAsked`).
+- A "Push notifications" row in the hamburger menu lets the user toggle on/off anytime. Toggling off calls `DELETE /memberships/devices` and unsets the local opt-in flag. Toggling on re-runs the permission flow; if iOS has permanently denied permission, we show a modal directing them to iOS Settings.
+- The toggle row only renders inside the Capacitor iOS app — web users see no notifications option at all.
+- Granted device tokens are registered via `POST /memberships/devices` and stored in `member_devices`. On every cold launch, if the user is opted in, we re-call `register()` so APNs token rotation is captured.
 - From the admin console's "Notifications" tab, ops writes a title + body, picks a target (ad-hoc or a specific venue), previews the push, and clicks Send. Every active iOS device receives it immediately.
-- Venue-targeted pushes carry `route: "/venue/<id>"` so the app deep-links into the venue detail screen. Ad-hoc pushes open the home list.
+- Venue-targeted pushes carry `route: "/venue/<id>"` so tapping the notification opens the venue detail screen via the existing hash router. Ad-hoc pushes open the home list.
 - APNs responses are checked per token; tokens that APNs marks `410 BadDeviceToken` or `Unregistered` are auto-revoked in `member_devices`.
 
 ### Required setup (Apple side, one-time)
@@ -416,5 +418,8 @@ Phase 1 is iOS-only and manually triggered from the admin console. No scheduling
 4. On Render, add the three env vars `APNS_AUTH_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`, plus `APNS_PRODUCTION=true`. TestFlight and App Store builds both use the production APNs gateway — only local Xcode dev builds use the sandbox.
 5. Redeploy the API on Render.
 
+### iOS build steps (handled in CI)
+The push entitlement is not part of the committed source — `apps/member/ios/` is regenerated on every CI run. The workflow `.github/workflows/ios-build.yml` writes `App.entitlements` with `aps-environment = production` and registers it on the Xcode target via the `xcodeproj` Ruby gem, immediately after `cap sync`. The Capacitor `@capacitor/push-notifications` plugin (declared in `apps/member/package.json`) brings in the native iOS pieces; AppDelegate already forwards push registration callbacks to Capacitor.
+
 ### Local development
-If the APNs env vars aren't set, `/admin/notifications/send` returns `503 apns_not_configured` and the admin UI surfaces the error. Everything else (device registration, recipient count, UI) still works for testing.
+If the APNs env vars aren't set, `/admin/notifications/send` returns `503 apns_not_configured` and the admin UI surfaces the error. Everything else (device registration, recipient count, UI) still works for testing. On web, `pushIsAvailable()` returns false so the soft prompt and menu toggle never render.

@@ -14,3 +14,6 @@ apps/member/ios/
 
 # Signing credentials — never commit
 certs/
+*.p8
+*.p12
+*.mobileprovision

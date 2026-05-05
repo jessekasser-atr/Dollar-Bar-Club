@@ -25,6 +25,281 @@ const API_BASE = resolveApiBase();
 const GEO_RADIUS_METERS = 200;
 let isMenuOpen = false;
 
+// ---------------- Push notifications ----------------
+// iOS-only via Capacitor's PushNotifications plugin. On web, every guard
+// short-circuits so this module is a no-op.
+
+const PUSH_ASKED_KEY = "dbc_pushAsked";
+const PUSH_OPTED_IN_KEY = "dbc_pushOptedIn";
+const PUSH_TOKEN_KEY = "dbc_pushDeviceToken";
+
+function pushIsAvailable() {
+  return Boolean(
+    typeof window !== "undefined" &&
+    window.Capacitor &&
+    typeof window.Capacitor.isNativePlatform === "function" &&
+    window.Capacitor.isNativePlatform() &&
+    window.Capacitor.getPlatform &&
+    window.Capacitor.getPlatform() === "ios" &&
+    window.Capacitor.Plugins &&
+    window.Capacitor.Plugins.PushNotifications
+  );
+}
+
+function pushPlugin() {
+  return window.Capacitor.Plugins.PushNotifications;
+}
+
+function pushHasAsked() {
+  return localStorage.getItem(PUSH_ASKED_KEY) === "1";
+}
+
+function pushMarkAsked() {
+  localStorage.setItem(PUSH_ASKED_KEY, "1");
+}
+
+function pushIsOptedIn() {
+  return localStorage.getItem(PUSH_OPTED_IN_KEY) === "1";
+}
+
+function pushSetOptedIn(value) {
+  if (value) {
+    localStorage.setItem(PUSH_OPTED_IN_KEY, "1");
+  } else {
+    localStorage.removeItem(PUSH_OPTED_IN_KEY);
+  }
+}
+
+let pushListenersAttached = false;
+let pushPendingTokenResolver = null;
+
+function pushAttachListeners() {
+  if (pushListenersAttached || !pushIsAvailable()) return;
+  const plugin = pushPlugin();
+
+  plugin.addListener("registration", async (token) => {
+    const value = token?.value || "";
+    if (!value) return;
+    localStorage.setItem(PUSH_TOKEN_KEY, value);
+    if (pushPendingTokenResolver) {
+      pushPendingTokenResolver(value);
+      pushPendingTokenResolver = null;
+    }
+    const membershipToken = getToken();
+    if (!membershipToken) return;
+    try {
+      await api("POST", "/memberships/devices", {
+        membershipToken,
+        deviceToken: value,
+        platform: "ios"
+      });
+    } catch (_error) {
+      // Backend unreachable; we'll retry on next launch.
+    }
+  });
+
+  plugin.addListener("registrationError", () => {
+    if (pushPendingTokenResolver) {
+      pushPendingTokenResolver(null);
+      pushPendingTokenResolver = null;
+    }
+  });
+
+  plugin.addListener("pushNotificationActionPerformed", (event) => {
+    const data = event?.notification?.data || {};
+    const route = data.route || (data.venueId ? `/venue/${data.venueId}` : null);
+    if (route) {
+      navigate(`#${route.startsWith("/") ? route : `/${route}`}`);
+    }
+  });
+
+  pushListenersAttached = true;
+}
+
+async function pushRequestAndRegister() {
+  if (!pushIsAvailable()) return { ok: false, reason: "not_available" };
+  const plugin = pushPlugin();
+  pushAttachListeners();
+
+  let permission;
+  try {
+    permission = await plugin.checkPermissions();
+  } catch (_error) {
+    permission = { receive: "prompt" };
+  }
+
+  if (permission.receive === "denied") {
+    return { ok: false, reason: "denied_in_settings" };
+  }
+
+  if (permission.receive !== "granted") {
+    try {
+      const requested = await plugin.requestPermissions();
+      if (requested.receive !== "granted") {
+        return { ok: false, reason: "user_declined" };
+      }
+    } catch (_error) {
+      return { ok: false, reason: "permission_error" };
+    }
+  }
+
+  const tokenPromise = new Promise((resolve) => {
+    pushPendingTokenResolver = resolve;
+    setTimeout(() => {
+      if (pushPendingTokenResolver === resolve) {
+        pushPendingTokenResolver = null;
+        resolve(null);
+      }
+    }, 8000);
+  });
+
+  try {
+    await plugin.register();
+  } catch (_error) {
+    pushPendingTokenResolver = null;
+    return { ok: false, reason: "register_error" };
+  }
+
+  const token = await tokenPromise;
+  if (!token) {
+    return { ok: false, reason: "no_token" };
+  }
+
+  pushSetOptedIn(true);
+  return { ok: true, token };
+}
+
+async function pushDisable() {
+  const deviceToken = localStorage.getItem(PUSH_TOKEN_KEY);
+  pushSetOptedIn(false);
+  if (!deviceToken) return;
+  const membershipToken = getToken();
+  if (!membershipToken) return;
+  try {
+    await api("DELETE", "/memberships/devices", {
+      membershipToken,
+      deviceToken
+    });
+  } catch (_error) {
+    // Best-effort; backend will eventually clean up via APNs invalid-token feedback.
+  }
+}
+
+async function pushSoftPromptIfNeeded() {
+  if (!pushIsAvailable()) return;
+  if (pushHasAsked()) return;
+
+  pushAttachListeners();
+
+  let permission;
+  try {
+    permission = await pushPlugin().checkPermissions();
+  } catch (_error) {
+    permission = { receive: "prompt" };
+  }
+
+  // If iOS already has a definitive answer, respect it without asking again.
+  if (permission.receive === "granted") {
+    pushMarkAsked();
+    pushSetOptedIn(true);
+    try { await pushPlugin().register(); } catch (_error) { /* ignore */ }
+    return;
+  }
+  if (permission.receive === "denied") {
+    pushMarkAsked();
+    return;
+  }
+
+  showModal(`
+    <h3>Stay in the loop</h3>
+    <p>Want us to let you know when new drink specials are added?</p>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="push-prompt-yes" type="button">Yes, notify me</button>
+      <button class="btn btn-ghost" id="push-prompt-no" type="button">Maybe later</button>
+    </div>
+  `);
+
+  document.getElementById("push-prompt-yes")?.addEventListener("click", async () => {
+    pushMarkAsked();
+    const yesBtn = document.getElementById("push-prompt-yes");
+    if (yesBtn) {
+      yesBtn.disabled = true;
+      yesBtn.textContent = "Working...";
+    }
+    await pushRequestAndRegister();
+    removeModal();
+  });
+
+  document.getElementById("push-prompt-no")?.addEventListener("click", () => {
+    pushMarkAsked();
+    removeModal();
+  });
+}
+
+async function pushReregisterIfOptedIn() {
+  if (!pushIsAvailable()) return;
+  if (!pushIsOptedIn()) return;
+  pushAttachListeners();
+  try {
+    const permission = await pushPlugin().checkPermissions();
+    if (permission.receive === "granted") {
+      await pushPlugin().register();
+    } else {
+      pushSetOptedIn(false);
+    }
+  } catch (_error) {
+    // ignore
+  }
+}
+
+async function handlePushToggleClick() {
+  if (!pushIsAvailable()) return;
+
+  if (pushIsOptedIn()) {
+    await pushDisable();
+    refreshPushMenuRow();
+    return;
+  }
+
+  let permission;
+  try {
+    permission = await pushPlugin().checkPermissions();
+  } catch (_error) {
+    permission = { receive: "prompt" };
+  }
+
+  if (permission.receive === "denied") {
+    showModal(`
+      <h3>Enable in iOS Settings</h3>
+      <p>You previously turned off notifications for Dollar Bar Club. To turn them back on, open the iOS Settings app, find Dollar Bar Club, and enable Notifications.</p>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="document.querySelector('.modal-overlay').remove()">Got it</button>
+      </div>
+    `);
+    return;
+  }
+
+  const result = await pushRequestAndRegister();
+  if (!result.ok && result.reason === "user_declined") {
+    showModal(`
+      <h3>Notifications are off</h3>
+      <p>You can enable them anytime from this menu, or from the iOS Settings app.</p>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="document.querySelector('.modal-overlay').remove()">Close</button>
+      </div>
+    `);
+  }
+  refreshPushMenuRow();
+}
+
+function refreshPushMenuRow() {
+  const stateEl = document.getElementById("push-toggle-state");
+  if (!stateEl) return;
+  const optedIn = pushIsOptedIn();
+  stateEl.textContent = optedIn ? "On" : "Off";
+  stateEl.classList.toggle("is-on", optedIn);
+}
+
 async function api(method, path, body) {
   const options = {
     method,
@@ -104,11 +379,19 @@ function bindShellActions() {
     toggleMenu();
   });
 
-  document.getElementById("logout-btn")?.addEventListener("click", () => {
+  document.getElementById("logout-btn")?.addEventListener("click", async () => {
     closeMenu();
+    if (pushIsAvailable() && pushIsOptedIn()) {
+      await pushDisable();
+    }
     clearToken();
     navigate("#/");
     renderOnboarding();
+  });
+
+  document.getElementById("push-toggle-btn")?.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    await handlePushToggleClick();
   });
 
   const searchInput = document.getElementById("search-input");
@@ -238,6 +521,16 @@ function shell(content, options = {}) {
           getToken()
             ? `
               <div class="nav-menu" id="nav-menu">
+                ${
+                  pushIsAvailable()
+                    ? `
+                      <button class="nav-menu-row" id="push-toggle-btn" type="button">
+                        <span>Push notifications</span>
+                        <span class="nav-menu-row-state${pushIsOptedIn() ? " is-on" : ""}" id="push-toggle-state">${pushIsOptedIn() ? "On" : "Off"}</span>
+                      </button>
+                    `
+                    : ""
+                }
                 <button class="nav-menu-btn" id="logout-btn" type="button">Log out</button>
               </div>
             `
@@ -406,6 +699,7 @@ async function handleClaim(event) {
     setToken(data.membershipToken);
     navigate("#/");
     renderVenueList();
+    pushSoftPromptIfNeeded();
   } catch (error) {
     const reason = error.data?.reason;
     if (reason === "email_and_zip_required") {
@@ -441,6 +735,7 @@ async function handleLogin(event) {
     setToken(data.membershipToken);
     navigate("#/");
     renderVenueList();
+    pushSoftPromptIfNeeded();
   } catch (error) {
     const reason = error.data?.reason;
     if (reason === "member_not_found" || reason === "membership_not_found") {
@@ -1170,6 +1465,8 @@ document.addEventListener("click", (event) => {
 if (window.Capacitor && window.Capacitor.isNativePlatform()) {
   document.documentElement.classList.add("native");
 }
+
+pushReregisterIfOptedIn();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

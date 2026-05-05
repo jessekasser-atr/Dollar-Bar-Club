@@ -1157,6 +1157,62 @@
       color: var(--accent);
     }
 
+    .modal-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .modal-actions .btn {
+      width: 100%;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover,
+    .btn-ghost:focus-visible {
+      color: var(--text);
+      border-color: var(--border-accent);
+    }
+
+    .nav-menu-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      padding: 10px 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .nav-menu-row:hover,
+    .nav-menu-row:focus-visible {
+      border-color: var(--border-accent);
+    }
+
+    .nav-menu-row-state {
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .nav-menu-row-state.is-on {
+      color: var(--accent);
+    }
+
     .loading-block,
     .empty-panel {
       text-align: center;

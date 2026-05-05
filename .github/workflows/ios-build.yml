@@ -115,6 +115,35 @@ jobs:
           }
           SWIFT
 
+      - name: Add Push Notifications entitlement
+        working-directory: apps/member/ios/App/App
+        run: |
+          cat > App.entitlements << 'XML'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>aps-environment</key>
+              <string>production</string>
+          </dict>
+          </plist>
+          XML
+
+      - name: Register entitlements file in Xcode project
+        working-directory: apps/member/ios/App
+        run: |
+          gem install xcodeproj --no-document
+          ruby <<'RUBY'
+          require 'xcodeproj'
+          project = Xcodeproj::Project.open('App.xcodeproj')
+          target = project.targets.find { |t| t.name == 'App' } || raise('App target not found')
+          target.build_configurations.each do |config|
+            config.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'App/App.entitlements'
+          end
+          project.save
+          puts "Entitlements registered on App target."
+          RUBY
+
       - name: Set app version from package.json
         working-directory: apps/member
         run: |

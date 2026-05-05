@@ -293,6 +293,40 @@ const migrations = [
     run(db) {
       ensureColumn(db, "offers", "available_days", "available_days TEXT");
     }
+  },
+  {
+    id: "009_member_devices",
+    run(db) {
+      ensureTable(
+        db,
+        "member_devices",
+        `CREATE TABLE member_devices (
+          id TEXT PRIMARY KEY,
+          member_id TEXT NOT NULL,
+          device_token TEXT NOT NULL,
+          platform TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+          revoked_at TEXT,
+          FOREIGN KEY (member_id) REFERENCES members(id)
+        )`
+      );
+      ensureIndex(
+        db,
+        "idx_member_devices_token",
+        "CREATE UNIQUE INDEX idx_member_devices_token ON member_devices(device_token)"
+      );
+      ensureIndex(
+        db,
+        "idx_member_devices_member",
+        "CREATE INDEX idx_member_devices_member ON member_devices(member_id)"
+      );
+      ensureIndex(
+        db,
+        "idx_member_devices_active",
+        "CREATE INDEX idx_member_devices_active ON member_devices(revoked_at)"
+      );
+    }
   }
 ];
 

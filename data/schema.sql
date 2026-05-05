@@ -91,6 +91,21 @@ CREATE TABLE IF NOT EXISTS redemptions (
   FOREIGN KEY (venue_id) REFERENCES venues(id)
 );
 
+CREATE TABLE IF NOT EXISTS member_devices (
+  id TEXT PRIMARY KEY,
+  member_id TEXT NOT NULL,
+  device_token TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+  revoked_at TEXT,
+  FOREIGN KEY (member_id) REFERENCES members(id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_member_devices_token ON member_devices(device_token);
+CREATE INDEX IF NOT EXISTS idx_member_devices_member ON member_devices(member_id);
+CREATE INDEX IF NOT EXISTS idx_member_devices_active ON member_devices(revoked_at);
+
 CREATE INDEX IF NOT EXISTS idx_memberships_member_id ON memberships(member_id);
 CREATE INDEX IF NOT EXISTS idx_member_offers_token ON member_offers(token);
 CREATE INDEX IF NOT EXISTS idx_member_offers_member_offer ON member_offers(member_id, offer_id);

@@ -314,6 +314,7 @@
           <button class="tab-btn" data-tab="offers">Offers</button>
           <button class="tab-btn" data-tab="redemptions">Redemptions</button>
           <button class="tab-btn" data-tab="members">Members</button>
+          <button class="tab-btn" data-tab="notifications">Notifications</button>
           <button class="tab-btn" data-tab="sync">Sync</button>
         </nav>
 
@@ -558,6 +559,72 @@
             <span id="memberSummary" style="color:var(--muted);font-size:13px;"></span>
           </div>
           <div id="memberList" class="offers"></div>
+        </div>
+
+        <!-- NOTIFICATIONS TAB -->
+        <div class="tab-content" id="tab-notifications">
+          <div class="section-header">
+            <h2>Send Push Notification</h2>
+            <p>iOS only. Every active device that opted in will receive this push. There is no undo.</p>
+          </div>
+
+          <div class="sub-section">
+            <h3>Message</h3>
+            <div class="grid">
+              <div>
+                <label for="pushTarget">Target</label>
+                <select id="pushTarget">
+                  <option value="none">Ad-hoc (opens home)</option>
+                  <option value="venue">About a venue (deep-links to venue)</option>
+                </select>
+              </div>
+              <div id="pushVenueWrap" style="display:none;">
+                <label for="pushVenueId">Venue</label>
+                <select id="pushVenueId">
+                  <option value="">Select a venue...</option>
+                </select>
+              </div>
+              <div>
+                <label for="pushTitle">Title <span style="color:var(--muted);font-weight:400;">(max 80)</span></label>
+                <input id="pushTitle" maxlength="80" placeholder="New bar added!" />
+              </div>
+              <div>
+                <label for="pushBody">Body <span style="color:var(--muted);font-weight:400;">(max 240)</span></label>
+                <input id="pushBody" maxlength="240" placeholder="Say hello to Bar Name - $1 specials start this week." />
+              </div>
+            </div>
+          </div>
+
+          <div class="sub-section" id="pushPreviewPanel" style="display:none;">
+            <h3>Preview &amp; Confirm</h3>
+            <div id="pushPreviewCard" style="
+              max-width: 420px;
+              border: 1px solid var(--line);
+              border-radius: 14px;
+              padding: 12px 14px;
+              background: linear-gradient(180deg, #ffffff 0%, #f5f6f8 100%);
+              box-shadow: 0 4px 14px rgba(15,20,30,0.08);
+              margin-bottom: 14px;
+            ">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;color:var(--muted);font-size:12px;">
+                <div style="width:24px;height:24px;border-radius:6px;background:#161b22;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;">DBC</div>
+                <span>DOLLAR BAR CLUB</span>
+                <span style="margin-left:auto;">now</span>
+              </div>
+              <div id="pushPreviewTitle" style="font-weight:700;font-size:15px;margin-bottom:2px;"></div>
+              <div id="pushPreviewBody" style="font-size:14px;color:#2a2f38;"></div>
+            </div>
+            <div id="pushRecipientLine" style="color:var(--muted);font-size:13px;margin-bottom:12px;"></div>
+            <div class="card-actions">
+              <button id="pushSendBtn">Send now</button>
+              <button id="pushCancelBtn" class="secondary" type="button">Edit</button>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button id="pushPreviewBtn">Preview</button>
+          </div>
+          <div id="pushStatus" style="margin-top:12px;color:var(--muted);font-size:13px;"></div>
         </div>
 
         <!-- SYNC TAB -->

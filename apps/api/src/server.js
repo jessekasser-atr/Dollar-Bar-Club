@@ -2,6 +2,7 @@ import express from "express";
 import {
   clearVenueProfile,
   claimMembership,
+  countActiveDevices,
   createOffer,
   createVenue,
   DB_PATH,
@@ -9,7 +10,10 @@ import {
   deleteVenue,
   getActiveOffers,
   getCounts,
+  getMembershipByToken,
+  getVenueById,
   getWeeklyResetInfo,
+  listActiveDeviceTokens,
   listOffers,
   getVenueOffers,
   listEnabledVenues,
@@ -18,6 +22,8 @@ import {
   listRedemptions,
   listVenues,
   redeemOffer,
+  registerDevice,
+  revokeDevice,
   setOfferActive,
   updateOfferContent,
   extendExpiredOffers,
@@ -27,6 +33,7 @@ import {
   updateVenueProfile
 } from "./db.js";
 import { getBarglanceApiKey } from "./barglance.js";
+import { isApnsConfigured, sendApnsNotification } from "./notifications.js";
 
 const app = express();
 app.use(express.json());
@@ -252,6 +259,56 @@ app.post("/memberships/login", claimRateLimiter, (req, res) => {
   });
 });
 
+app.post("/memberships/devices", (req, res) => {
+  const { membershipToken, deviceToken, platform } = req.body || {};
+  const normalizedMembership = String(membershipToken || "").trim();
+  const normalizedDevice = String(deviceToken || "").trim();
+  const normalizedPlatform = String(platform || "ios").trim().toLowerCase();
+
+  if (!normalizedMembership || !normalizedDevice) {
+    return res.status(400).json({ ok: false, reason: "membership_and_device_required" });
+  }
+
+  const membership = getMembershipByToken(normalizedMembership);
+  if (!membership) {
+    return res.status(404).json({ ok: false, reason: "membership_not_found" });
+  }
+
+  const result = registerDevice({
+    memberId: membership.memberId,
+    deviceToken: normalizedDevice,
+    platform: normalizedPlatform
+  });
+
+  if (!result.ok) {
+    return res.status(400).json({ ok: false, reason: result.reason });
+  }
+
+  return res.json({ ok: true });
+});
+
+app.delete("/memberships/devices", (req, res) => {
+  const { membershipToken, deviceToken } = req.body || {};
+  const normalizedMembership = String(membershipToken || "").trim();
+  const normalizedDevice = String(deviceToken || "").trim();
+
+  if (!normalizedDevice) {
+    return res.status(400).json({ ok: false, reason: "device_required" });
+  }
+
+  let memberId = null;
+  if (normalizedMembership) {
+    const membership = getMembershipByToken(normalizedMembership);
+    if (!membership) {
+      return res.status(404).json({ ok: false, reason: "membership_not_found" });
+    }
+    memberId = membership.memberId;
+  }
+
+  revokeDevice({ memberId, deviceToken: normalizedDevice });
+  return res.json({ ok: true });
+});
+
 app.get("/offers/active", (req, res) => {
   const { venueId, membershipToken } = req.query || {};
   const membershipTokenValue = membershipToken ? String(membershipToken) : null;
@@ -435,6 +492,70 @@ app.post("/redeem", redeemRateLimiter, (req, res) => {
     console.error("Redeem error:", err);
     return res.status(500).json({ ok: false, reason: "internal_error" });
   }
+});
+
+app.get("/admin/notifications/status", requireAdminAccess, (_req, res) => {
+  res.json({
+    ok: true,
+    apnsConfigured: isApnsConfigured(),
+    recipientCount: countActiveDevices()
+  });
+});
+
+app.post("/admin/notifications/send", requireAdminAccess, async (req, res) => {
+  const { title, body, target } = req.body || {};
+  const normalizedTitle = String(title || "").trim();
+  const normalizedBody = String(body || "").trim();
+
+  if (!normalizedTitle || !normalizedBody) {
+    return res.status(400).json({ ok: false, reason: "title_and_body_required" });
+  }
+  if (normalizedTitle.length > 80 || normalizedBody.length > 240) {
+    return res.status(400).json({ ok: false, reason: "content_too_long" });
+  }
+
+  const targetType = String(target?.type || "none").trim().toLowerCase();
+  const deepLinkData = {};
+
+  if (targetType === "venue") {
+    const venueId = String(target?.venueId || "").trim();
+    if (!venueId) {
+      return res.status(400).json({ ok: false, reason: "venue_id_required" });
+    }
+    const venue = getVenueById(venueId);
+    if (!venue) {
+      return res.status(404).json({ ok: false, reason: "venue_not_found" });
+    }
+    deepLinkData.route = `/venue/${venueId}`;
+    deepLinkData.venueId = venueId;
+  } else if (targetType !== "none") {
+    return res.status(400).json({ ok: false, reason: "invalid_target_type" });
+  }
+
+  const devices = listActiveDeviceTokens().filter((d) => d.platform === "ios");
+
+  if (!isApnsConfigured()) {
+    return res.status(503).json({ ok: false, reason: "apns_not_configured", total: devices.length });
+  }
+
+  const result = await sendApnsNotification({
+    devices,
+    alert: { title: normalizedTitle, body: normalizedBody },
+    data: deepLinkData
+  });
+
+  for (const token of result.invalidTokens) {
+    revokeDevice({ deviceToken: token });
+  }
+
+  return res.json({
+    ok: true,
+    total: devices.length,
+    sent: result.sent,
+    failed: result.failed,
+    invalidTokens: result.invalidTokens.length,
+    errors: result.errors.slice(0, 10)
+  });
 });
 
 app.get("/admin/venues", requireAdminAccess, (_req, res) => {

@@ -1356,6 +1356,71 @@ function deleteVenue(venueId) {
   return deleteVenueTxn(venueId);
 }
 
+const upsertDeviceStmt = db.prepare(`
+  INSERT INTO member_devices (id, member_id, device_token, platform, created_at, last_seen_at, revoked_at)
+  VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), NULL)
+  ON CONFLICT(device_token) DO UPDATE SET
+    member_id = excluded.member_id,
+    platform = excluded.platform,
+    last_seen_at = datetime('now'),
+    revoked_at = NULL
+`);
+
+const revokeDeviceByTokenStmt = db.prepare(`
+  UPDATE member_devices
+  SET revoked_at = datetime('now')
+  WHERE device_token = ? AND (member_id = ? OR ? IS NULL)
+`);
+
+const revokeDeviceForAllStmt = db.prepare(`
+  UPDATE member_devices
+  SET revoked_at = datetime('now')
+  WHERE device_token = ?
+`);
+
+const countActiveDevicesStmt = db.prepare(`
+  SELECT COUNT(*) AS count FROM member_devices WHERE revoked_at IS NULL
+`);
+
+const listActiveDeviceTokensStmt = db.prepare(`
+  SELECT device_token AS deviceToken, member_id AS memberId, platform
+  FROM member_devices
+  WHERE revoked_at IS NULL
+`);
+
+function registerDevice({ memberId, deviceToken, platform }) {
+  if (!memberId || !deviceToken) {
+    return { ok: false, reason: "member_and_token_required" };
+  }
+  upsertDeviceStmt.run(
+    createId("dev"),
+    memberId,
+    deviceToken,
+    platform || "ios"
+  );
+  return { ok: true };
+}
+
+function revokeDevice({ memberId = null, deviceToken }) {
+  if (!deviceToken) {
+    return { ok: false, reason: "token_required" };
+  }
+  if (memberId) {
+    revokeDeviceByTokenStmt.run(deviceToken, memberId, memberId);
+  } else {
+    revokeDeviceForAllStmt.run(deviceToken);
+  }
+  return { ok: true };
+}
+
+function countActiveDevices() {
+  return countActiveDevicesStmt.get().count;
+}
+
+function listActiveDeviceTokens() {
+  return listActiveDeviceTokensStmt.all();
+}
+
 function listMembers() {
   return listMembersStmt.all().map((row) => ({
     id: row.id,
@@ -1370,9 +1435,14 @@ function listMembers() {
 
 export {
   claimMembership,
+  countActiveDevices,
   createOffer,
+  getMembershipByToken,
+  listActiveDeviceTokens,
   listMembers,
   loginByEmail,
+  registerDevice,
+  revokeDevice,
   createVenue,
   DB_PATH,
   deleteOffer,

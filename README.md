@@ -221,6 +221,8 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 | `GET` | `/venues` | None | Returns enabled pilot venues only |
 | `GET` | `/venues/:id` | None | Venue with offers, optional `membershipToken` enrichment |
 | `POST` | `/redeem` | Rate limited | Redeem an offer once per Austin week (`Sunday 12:00 AM` reset) |
+| `POST` | `/memberships/devices` | None | Register an iOS APNs device token. Body: `{ membershipToken, deviceToken, platform }` |
+| `DELETE` | `/memberships/devices` | None | Revoke a device token. Body: `{ membershipToken?, deviceToken }` |
 
 ### Admin
 
@@ -244,6 +246,8 @@ All admin routes require the `X-Admin-Key` header.
 | `POST` | `/admin/sync/barglance` | Sync venues from BarGlance |
 | `GET` | `/admin/redemptions` | Redemption event log |
 | `GET` | `/admin/members` | List all members |
+| `GET` | `/admin/notifications/status` | APNs config status + active device count |
+| `POST` | `/admin/notifications/send` | Send a push. Body: `{ title, body, target: { type: "none"\|"venue", venueId? } }` |
 
 ### Rate Limits
 
@@ -311,6 +315,11 @@ In-memory limiters reset on API restart.
 | `ALLOWED_ORIGINS` | Yes | Comma-separated list of allowed CORS origins (Capacitor WebView origins are always appended automatically) |
 | `BARGLANCE_API_KEY` | Optional | BarGlance partner API key for venue sync |
 | `BAR_DATA_SOURCE` | Optional | `"seed"` (default) or `"barglance"` |
+| `APNS_AUTH_KEY` | Optional | Full contents of the APNs `.p8` key file. Required for push notifications. |
+| `APNS_KEY_ID` | Optional | 10-char APNs key ID from the Apple Developer portal. Required for push. |
+| `APNS_TEAM_ID` | Optional | 10-char Apple Developer team ID. Required for push. |
+| `APNS_BUNDLE_ID` | Optional | iOS bundle ID (default `com.barglance.dollarbarclub`) |
+| `APNS_PRODUCTION` | Optional | `"true"` for App Store builds; anything else targets the APNs sandbox. |
 
 ### Vercel (Website Functions)
 
@@ -387,4 +396,25 @@ The iOS build and upload pipeline runs via GitHub Actions (`.github/workflows/io
 - Path: `data/dbc.sqlite` resolved relative to repo root
 - Migrations: numbered runtime migrations tracked in `schema_migrations`
 - Reference schema: `data/schema.sql`
-- Key tables: `members`, `memberships`, `venues`, `offers`, `member_offers`, `redemptions`
+- Key tables: `members`, `memberships`, `venues`, `offers`, `member_offers`, `redemptions`, `member_devices`
+
+## Push Notifications (iOS)
+
+Phase 1 is iOS-only and manually triggered from the admin console. No scheduling, no automation, no web push.
+
+### How it works
+- On first signup/login, the iOS app prompts for push permission. A toggle in the menu lets members opt in/out anytime.
+- Granted device tokens are registered via `POST /memberships/devices` and stored in `member_devices`.
+- From the admin console's "Notifications" tab, ops writes a title + body, picks a target (ad-hoc or a specific venue), previews the push, and clicks Send. Every active iOS device receives it immediately.
+- Venue-targeted pushes carry `route: "/venue/<id>"` so the app deep-links into the venue detail screen. Ad-hoc pushes open the home list.
+- APNs responses are checked per token; tokens that APNs marks `410 BadDeviceToken` or `Unregistered` are auto-revoked in `member_devices`.
+
+### Required setup (Apple side, one-time)
+1. In the Apple Developer portal, enable the "Push Notifications" capability on the `com.barglance.dollarbarclub` App ID.
+2. Generate an APNs Auth Key (`.p8`). Save the Key ID, your Team ID, and the full contents of the `.p8` file (it starts with `-----BEGIN PRIVATE KEY-----`).
+3. Regenerate the app's provisioning profile so it includes the new Push entitlement; re-upload it to GitHub Secrets if the iOS CI workflow needs it.
+4. On Render, add the three env vars `APNS_AUTH_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`, plus `APNS_PRODUCTION=true`. TestFlight and App Store builds both use the production APNs gateway — only local Xcode dev builds use the sandbox.
+5. Redeploy the API on Render.
+
+### Local development
+If the APNs env vars aren't set, `/admin/notifications/send` returns `503 apns_not_configured` and the admin UI surfaces the error. Everything else (device registration, recipient count, UI) still works for testing.

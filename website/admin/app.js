@@ -149,7 +149,20 @@ function renderOpsApp() {
     manualVenueCityEl: document.getElementById("manualVenueCity"),
     manualVenueStateEl: document.getElementById("manualVenueState"),
     manualVenueTypeEl: document.getElementById("manualVenueType"),
-    manualVenueNeighborhoodEl: document.getElementById("manualVenueNeighborhood")
+    manualVenueNeighborhoodEl: document.getElementById("manualVenueNeighborhood"),
+    pushTargetEl: document.getElementById("pushTarget"),
+    pushVenueWrapEl: document.getElementById("pushVenueWrap"),
+    pushVenueIdEl: document.getElementById("pushVenueId"),
+    pushTitleEl: document.getElementById("pushTitle"),
+    pushBodyEl: document.getElementById("pushBody"),
+    pushPreviewBtn: document.getElementById("pushPreviewBtn"),
+    pushPreviewPanel: document.getElementById("pushPreviewPanel"),
+    pushPreviewTitle: document.getElementById("pushPreviewTitle"),
+    pushPreviewBody: document.getElementById("pushPreviewBody"),
+    pushRecipientLine: document.getElementById("pushRecipientLine"),
+    pushSendBtn: document.getElementById("pushSendBtn"),
+    pushCancelBtn: document.getElementById("pushCancelBtn"),
+    pushStatusEl: document.getElementById("pushStatus")
   };
 
   bindEvents();
@@ -164,6 +177,111 @@ function switchTab(tabId) {
   });
   if (tabId === "members" && allMembers.length === 0) {
     loadMemberList();
+  }
+  if (tabId === "notifications") {
+    populatePushVenueOptions();
+    refreshPushRecipientCount();
+  }
+}
+
+function populatePushVenueOptions() {
+  if (!ui.pushVenueIdEl) return;
+  const previous = ui.pushVenueIdEl.value;
+  const enabled = allVenues.filter((v) => v.enabled);
+  const options = ['<option value="">Select a venue...</option>']
+    .concat(enabled.map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.name)}</option>`));
+  ui.pushVenueIdEl.innerHTML = options.join("");
+  if (previous) {
+    ui.pushVenueIdEl.value = previous;
+  }
+}
+
+async function refreshPushRecipientCount() {
+  try {
+    const data = await jsonFetch("/admin/notifications/status");
+    const count = Number(data.recipientCount || 0);
+    const configured = Boolean(data.apnsConfigured);
+    const parts = [`${count} device${count === 1 ? "" : "s"} registered`];
+    if (!configured) {
+      parts.push("APNs not configured yet - sends will fail until the key is set on Render.");
+    }
+    ui.pushStatusEl.style.color = configured ? "var(--muted)" : "var(--danger)";
+    ui.pushStatusEl.textContent = parts.join(" | ");
+  } catch (error) {
+    if (String(error.message || error) !== "admin_access_required") {
+      ui.pushStatusEl.style.color = "var(--danger)";
+      ui.pushStatusEl.textContent = "Could not load notification status.";
+    }
+  }
+}
+
+function showPushPreview() {
+  const title = ui.pushTitleEl.value.trim();
+  const body = ui.pushBodyEl.value.trim();
+  const targetType = ui.pushTargetEl.value;
+
+  if (!title || !body) {
+    ui.pushStatusEl.style.color = "var(--danger)";
+    ui.pushStatusEl.textContent = "Title and body are required.";
+    return;
+  }
+
+  if (targetType === "venue" && !ui.pushVenueIdEl.value) {
+    ui.pushStatusEl.style.color = "var(--danger)";
+    ui.pushStatusEl.textContent = "Pick a venue or switch the target to ad-hoc.";
+    return;
+  }
+
+  ui.pushPreviewTitle.textContent = title;
+  ui.pushPreviewBody.textContent = body;
+  ui.pushPreviewPanel.style.display = "block";
+  ui.pushStatusEl.textContent = "";
+  refreshPushRecipientCount().then(() => {
+    // Mirror the recipient count into the preview panel for clarity.
+    ui.pushRecipientLine.textContent = ui.pushStatusEl.textContent;
+  });
+  ui.pushPreviewPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function sendPush() {
+  const title = ui.pushTitleEl.value.trim();
+  const body = ui.pushBodyEl.value.trim();
+  const targetType = ui.pushTargetEl.value;
+  const target = targetType === "venue"
+    ? { type: "venue", venueId: ui.pushVenueIdEl.value }
+    : { type: "none" };
+
+  ui.pushSendBtn.disabled = true;
+  ui.pushSendBtn.textContent = "Sending...";
+  ui.pushStatusEl.style.color = "var(--muted)";
+  ui.pushStatusEl.textContent = "Sending...";
+
+  try {
+    const data = await jsonFetch("/admin/notifications/send", {
+      method: "POST",
+      headers: getAdminHeaders(),
+      body: JSON.stringify({ title, body, target })
+    });
+    ui.pushStatusEl.style.color = "var(--ok)";
+    ui.pushStatusEl.textContent = `Sent to ${data.sent} of ${data.total} device${data.total === 1 ? "" : "s"}.` +
+      (data.failed ? ` ${data.failed} failed.` : "") +
+      (data.invalidTokens ? ` ${data.invalidTokens} stale token${data.invalidTokens === 1 ? "" : "s"} revoked.` : "");
+    renderResult(true, data);
+    ui.pushPreviewPanel.style.display = "none";
+    ui.pushTitleEl.value = "";
+    ui.pushBodyEl.value = "";
+  } catch (error) {
+    if (String(error.message || error) === "admin_access_required") return;
+    ui.pushStatusEl.style.color = "var(--danger)";
+    let reason = "send_failed";
+    try { reason = JSON.parse(String(error.message || "{}")).reason || reason; } catch (_) { /* ignore */ }
+    ui.pushStatusEl.textContent = reason === "apns_not_configured"
+      ? "APNs is not configured on the API. Set APNS_AUTH_KEY, APNS_KEY_ID, APNS_TEAM_ID on Render and redeploy."
+      : `Send failed: ${reason}`;
+    renderResult(false, { ok: false, reason, error: String(error) });
+  } finally {
+    ui.pushSendBtn.disabled = false;
+    ui.pushSendBtn.textContent = "Send now";
   }
 }
 
@@ -948,6 +1066,22 @@ function bindEvents() {
   ui.memberSearchEl.addEventListener("input", renderMemberList);
   ui.saveVenueProfileBtn.addEventListener("click", saveVenueProfile);
   ui.clearVenueProfileBtn.addEventListener("click", clearVenueProfileOverrides);
+
+  ui.pushTargetEl.addEventListener("change", () => {
+    ui.pushVenueWrapEl.style.display = ui.pushTargetEl.value === "venue" ? "block" : "none";
+    ui.pushPreviewPanel.style.display = "none";
+  });
+  ["pushTitleEl", "pushBodyEl", "pushVenueIdEl"].forEach((key) => {
+    ui[key].addEventListener("input", () => {
+      ui.pushPreviewPanel.style.display = "none";
+    });
+  });
+  ui.pushPreviewBtn.addEventListener("click", showPushPreview);
+  ui.pushCancelBtn.addEventListener("click", () => {
+    ui.pushPreviewPanel.style.display = "none";
+    ui.pushTitleEl.focus();
+  });
+  ui.pushSendBtn.addEventListener("click", sendPush);
 
   ui.syncBarglanceBtn.addEventListener("click", async () => {
     const state = ui.syncStateEl.value.trim();

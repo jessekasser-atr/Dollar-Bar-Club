@@ -100,55 +100,87 @@ function trimLeadingZeros(buf) {
 
 let cachedClient = null;
 
+function isSessionUsable(session) {
+  if (!session) return false;
+  if (session.destroyed) return false;
+  if (session.closed) return false;
+  // `session.connecting` exists in node 16+; if the session is still negotiating, treat as usable.
+  return true;
+}
+
+function resetClient() {
+  if (cachedClient) {
+    try { cachedClient.session.destroy(); } catch (_) { /* ignore */ }
+  }
+  cachedClient = null;
+}
+
 function getClient(config) {
   const host = config.production ? PROD_HOST : SANDBOX_HOST;
-  if (cachedClient && cachedClient.host === host && !cachedClient.session.destroyed) {
+  if (cachedClient && cachedClient.host === host && isSessionUsable(cachedClient.session)) {
     return cachedClient.session;
   }
-  if (cachedClient) {
-    try { cachedClient.session.close(); } catch (_) { /* ignore */ }
-  }
+  resetClient();
   const session = http2.connect(`https://${host}`);
-  session.on("error", () => { /* swallow; next call will reconnect */ });
+  session.on("error", () => { resetClient(); });
+  session.on("close", () => { resetClient(); });
+  session.on("goaway", () => { resetClient(); });
   cachedClient = { host, session };
   return session;
 }
 
 function sendOne({ config, session, deviceToken, payload }) {
   return new Promise((resolve) => {
-    const body = JSON.stringify(payload);
-    const req = session.request({
-      ":method": "POST",
-      ":path": `/3/device/${deviceToken}`,
-      "apns-topic": config.bundleId,
-      "apns-push-type": "alert",
-      "apns-priority": "10",
-      "authorization": `bearer ${signJwt(config)}`,
-      "content-type": "application/json",
-      "content-length": Buffer.byteLength(body)
-    });
+    let token;
+    try {
+      token = signJwt(config);
+    } catch (err) {
+      resolve({ ok: false, deviceToken, status: 0, reason: `jwt_error:${err?.message || "unknown"}` });
+      return;
+    }
 
-    let status = 0;
-    let responseBody = "";
+    let req;
+    try {
+      const body = JSON.stringify(payload);
+      req = session.request({
+        ":method": "POST",
+        ":path": `/3/device/${deviceToken}`,
+        "apns-topic": config.bundleId,
+        "apns-push-type": "alert",
+        "apns-priority": "10",
+        "authorization": `bearer ${token}`,
+        "content-type": "application/json",
+        "content-length": Buffer.byteLength(body)
+      });
 
-    req.on("response", (headers) => {
-      status = Number(headers[":status"] || 0);
-    });
-    req.on("data", (chunk) => { responseBody += chunk.toString(); });
-    req.on("end", () => {
-      if (status === 200) {
-        resolve({ ok: true, deviceToken, status });
-        return;
-      }
-      let reason = "unknown";
-      try { reason = JSON.parse(responseBody || "{}").reason || reason; } catch (_) { /* ignore */ }
-      resolve({ ok: false, deviceToken, status, reason });
-    });
-    req.on("error", (err) => {
-      resolve({ ok: false, deviceToken, status: 0, reason: err?.code || "request_error" });
-    });
+      let status = 0;
+      let responseBody = "";
 
-    req.end(body);
+      req.on("response", (headers) => {
+        status = Number(headers[":status"] || 0);
+      });
+      req.on("data", (chunk) => { responseBody += chunk.toString(); });
+      req.on("end", () => {
+        if (status === 200) {
+          resolve({ ok: true, deviceToken, status });
+          return;
+        }
+        let reason = "unknown";
+        try { reason = JSON.parse(responseBody || "{}").reason || reason; } catch (_) { /* ignore */ }
+        resolve({ ok: false, deviceToken, status, reason });
+      });
+      req.on("error", (err) => {
+        resolve({ ok: false, deviceToken, status: 0, reason: err?.code || "request_error" });
+      });
+
+      req.end(body);
+    } catch (err) {
+      // session.request can throw synchronously if the session got closed
+      // between our usability check and the call. Tear down the cache so the
+      // next attempt reconnects, and surface a structured error.
+      resetClient();
+      resolve({ ok: false, deviceToken, status: 0, reason: `session_error:${err?.code || err?.message || "unknown"}` });
+    }
   });
 }
 
@@ -161,38 +193,66 @@ function sendOne({ config, session, deviceToken, payload }) {
  * @param {Object} [args.data] - Custom data injected at the top level of the APNs payload.
  * @returns {Promise<{ok: boolean, sent: number, failed: number, invalidTokens: string[], errors: Array}>}
  */
-async function sendApnsNotification({ devices, alert, data = {} }) {
-  const config = getConfig();
-  if (!config.ok) {
-    return { ok: false, reason: config.reason, sent: 0, failed: 0, invalidTokens: [], errors: [] };
-  }
-
-  if (!Array.isArray(devices) || devices.length === 0) {
-    return { ok: true, sent: 0, failed: 0, invalidTokens: [], errors: [] };
-  }
-
-  const payload = {
-    aps: {
-      alert: { title: String(alert?.title || ""), body: String(alert?.body || "") },
-      sound: "default"
-    },
-    ...data
-  };
-
+async function sendBatchOnce({ config, devices, payload }) {
   const session = getClient(config);
-  const results = await Promise.all(
+  return Promise.all(
     devices.map((d) => sendOne({ config, session, deviceToken: d.deviceToken, payload }))
   );
+}
 
-  const sent = results.filter((r) => r.ok).length;
-  const failed = results.length - sent;
-  // Tokens APNs considers permanently invalid - caller should revoke these in the DB.
-  const invalidTokens = results
-    .filter((r) => !r.ok && (r.status === 410 || r.reason === "BadDeviceToken" || r.reason === "Unregistered"))
-    .map((r) => r.deviceToken);
-  const errors = results.filter((r) => !r.ok).map(({ deviceToken, status, reason }) => ({ deviceToken, status, reason }));
+async function sendApnsNotification({ devices, alert, data = {} }) {
+  try {
+    const config = getConfig();
+    if (!config.ok) {
+      return { ok: false, reason: config.reason, sent: 0, failed: 0, invalidTokens: [], errors: [] };
+    }
 
-  return { ok: true, sent, failed, invalidTokens, errors };
+    if (!Array.isArray(devices) || devices.length === 0) {
+      return { ok: true, sent: 0, failed: 0, invalidTokens: [], errors: [] };
+    }
+
+    const payload = {
+      aps: {
+        alert: { title: String(alert?.title || ""), body: String(alert?.body || "") },
+        sound: "default"
+      },
+      ...data
+    };
+
+    let results = await sendBatchOnce({ config, devices, payload });
+
+    // If every send failed with a session_error, the cached HTTP/2 connection
+    // was stale (idle timeout, GOAWAY, etc.). Reset and try once more so the
+    // user doesn't have to click Send twice.
+    const allSessionErrors = results.length > 0 && results.every((r) =>
+      !r.ok && typeof r.reason === "string" && r.reason.startsWith("session_error")
+    );
+    if (allSessionErrors) {
+      resetClient();
+      results = await sendBatchOnce({ config, devices, payload });
+    }
+
+    const sent = results.filter((r) => r.ok).length;
+    const failed = results.length - sent;
+    const invalidTokens = results
+      .filter((r) => !r.ok && (r.status === 410 || r.reason === "BadDeviceToken" || r.reason === "Unregistered"))
+      .map((r) => r.deviceToken);
+    const errors = results.filter((r) => !r.ok).map(({ deviceToken, status, reason }) => ({ deviceToken, status, reason }));
+
+    return { ok: true, sent, failed, invalidTokens, errors };
+  } catch (err) {
+    console.error("[notifications] sendApnsNotification failed:", err);
+    resetClient();
+    return {
+      ok: false,
+      reason: "send_error",
+      message: err?.message || "unknown",
+      sent: 0,
+      failed: Array.isArray(devices) ? devices.length : 0,
+      invalidTokens: [],
+      errors: []
+    };
+  }
 }
 
 function isApnsConfigured() {

@@ -274,11 +274,24 @@ async function sendPush() {
     if (String(error.message || error) === "admin_access_required") return;
     ui.pushStatusEl.style.color = "var(--danger)";
     let reason = "send_failed";
-    try { reason = JSON.parse(String(error.message || "{}")).reason || reason; } catch (_) { /* ignore */ }
-    ui.pushStatusEl.textContent = reason === "apns_not_configured"
-      ? "APNs is not configured on the API. Set APNS_AUTH_KEY, APNS_KEY_ID, APNS_TEAM_ID on Render and redeploy."
-      : `Send failed: ${reason}`;
-    renderResult(false, { ok: false, reason, error: String(error) });
+    let message = null;
+    try {
+      const parsed = JSON.parse(String(error.message || "{}"));
+      reason = parsed.reason || reason;
+      message = parsed.message || null;
+    } catch (_) { /* ignore */ }
+    let label;
+    if (reason === "apns_not_configured") {
+      label = "APNs is not configured on the API. Set APNS_AUTH_KEY, APNS_KEY_ID, APNS_TEAM_ID on Render and redeploy.";
+    } else if (reason === "send_error") {
+      label = `Send failed (APNs error): ${message || "unknown"}. Check Render logs for details.`;
+    } else if (reason === "internal_error") {
+      label = `Server error: ${message || "unknown"}. Check Render logs.`;
+    } else {
+      label = `Send failed: ${reason}`;
+    }
+    ui.pushStatusEl.textContent = label;
+    renderResult(false, { ok: false, reason, message, error: String(error) });
   } finally {
     ui.pushSendBtn.disabled = false;
     ui.pushSendBtn.textContent = "Send now";

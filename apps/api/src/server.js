@@ -503,59 +503,79 @@ app.get("/admin/notifications/status", requireAdminAccess, (_req, res) => {
 });
 
 app.post("/admin/notifications/send", requireAdminAccess, async (req, res) => {
-  const { title, body, target } = req.body || {};
-  const normalizedTitle = String(title || "").trim();
-  const normalizedBody = String(body || "").trim();
+  try {
+    const { title, body, target } = req.body || {};
+    const normalizedTitle = String(title || "").trim();
+    const normalizedBody = String(body || "").trim();
 
-  if (!normalizedTitle || !normalizedBody) {
-    return res.status(400).json({ ok: false, reason: "title_and_body_required" });
-  }
-  if (normalizedTitle.length > 80 || normalizedBody.length > 240) {
-    return res.status(400).json({ ok: false, reason: "content_too_long" });
-  }
-
-  const targetType = String(target?.type || "none").trim().toLowerCase();
-  const deepLinkData = {};
-
-  if (targetType === "venue") {
-    const venueId = String(target?.venueId || "").trim();
-    if (!venueId) {
-      return res.status(400).json({ ok: false, reason: "venue_id_required" });
+    if (!normalizedTitle || !normalizedBody) {
+      return res.status(400).json({ ok: false, reason: "title_and_body_required" });
     }
-    const venue = getVenueById(venueId);
-    if (!venue) {
-      return res.status(404).json({ ok: false, reason: "venue_not_found" });
+    if (normalizedTitle.length > 80 || normalizedBody.length > 240) {
+      return res.status(400).json({ ok: false, reason: "content_too_long" });
     }
-    deepLinkData.route = `/venue/${venueId}`;
-    deepLinkData.venueId = venueId;
-  } else if (targetType !== "none") {
-    return res.status(400).json({ ok: false, reason: "invalid_target_type" });
+
+    const targetType = String(target?.type || "none").trim().toLowerCase();
+    const deepLinkData = {};
+
+    if (targetType === "venue") {
+      const venueId = String(target?.venueId || "").trim();
+      if (!venueId) {
+        return res.status(400).json({ ok: false, reason: "venue_id_required" });
+      }
+      const venue = getVenueById(venueId);
+      if (!venue) {
+        return res.status(404).json({ ok: false, reason: "venue_not_found" });
+      }
+      deepLinkData.route = `/venue/${venueId}`;
+      deepLinkData.venueId = venueId;
+    } else if (targetType !== "none") {
+      return res.status(400).json({ ok: false, reason: "invalid_target_type" });
+    }
+
+    const devices = listActiveDeviceTokens().filter((d) => d.platform === "ios");
+
+    if (!isApnsConfigured()) {
+      return res.status(503).json({ ok: false, reason: "apns_not_configured", total: devices.length });
+    }
+
+    const result = await sendApnsNotification({
+      devices,
+      alert: { title: normalizedTitle, body: normalizedBody },
+      data: deepLinkData
+    });
+
+    if (!result.ok) {
+      return res.status(502).json({
+        ok: false,
+        reason: result.reason || "send_failed",
+        message: result.message || null,
+        total: devices.length,
+        sent: 0,
+        failed: result.failed || devices.length
+      });
+    }
+
+    for (const token of result.invalidTokens) {
+      revokeDevice({ deviceToken: token });
+    }
+
+    return res.json({
+      ok: true,
+      total: devices.length,
+      sent: result.sent,
+      failed: result.failed,
+      invalidTokens: result.invalidTokens.length,
+      errors: result.errors.slice(0, 10)
+    });
+  } catch (err) {
+    console.error("[admin/notifications/send] unhandled error:", err);
+    return res.status(500).json({
+      ok: false,
+      reason: "internal_error",
+      message: err?.message || "unknown"
+    });
   }
-
-  const devices = listActiveDeviceTokens().filter((d) => d.platform === "ios");
-
-  if (!isApnsConfigured()) {
-    return res.status(503).json({ ok: false, reason: "apns_not_configured", total: devices.length });
-  }
-
-  const result = await sendApnsNotification({
-    devices,
-    alert: { title: normalizedTitle, body: normalizedBody },
-    data: deepLinkData
-  });
-
-  for (const token of result.invalidTokens) {
-    revokeDevice({ deviceToken: token });
-  }
-
-  return res.json({
-    ok: true,
-    total: devices.length,
-    sent: result.sent,
-    failed: result.failed,
-    invalidTokens: result.invalidTokens.length,
-    errors: result.errors.slice(0, 10)
-  });
 });
 
 app.get("/admin/venues", requireAdminAccess, (_req, res) => {

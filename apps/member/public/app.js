@@ -583,18 +583,26 @@ function venueFallbackMarkup(label, sizeClass = "") {
   `;
 }
 
-function imageMarkup(imageUrl, alt, className, fallbackLabel, fallbackClass = "") {
-  if (!imageUrl) {
+function imageMarkup(imageUrl, alt, className, fallbackLabel, fallbackClass = "", fallbackImageUrl = "") {
+  const imageUrls = [imageUrl, fallbackImageUrl]
+    .map((url) => String(url || "").trim())
+    .filter(Boolean)
+    .filter((url, index, urls) => urls.indexOf(url) === index);
+
+  if (!imageUrls.length) {
     return venueFallbackMarkup(fallbackLabel, fallbackClass);
   }
+
+  const nextImageAttr = imageUrls[1] ? ` data-fallback-src="${escapeHtml(imageUrls[1])}"` : "";
 
   return `
     <img
       class="${className}"
-      src="${escapeHtml(imageUrl)}"
+      src="${escapeHtml(imageUrls[0])}"
+      ${nextImageAttr}
       alt="${escapeHtml(alt)}"
       loading="lazy"
-      onerror="this.style.display='none'; if (this.nextElementSibling) { this.nextElementSibling.style.display='flex'; }"
+      onerror="const next=this.dataset.fallbackSrc; if (next) { this.removeAttribute('data-fallback-src'); this.src=next; return; } this.style.display='none'; if (this.nextElementSibling) { this.nextElementSibling.style.display='flex'; }"
     >
     <div class="image-fallback ${fallbackClass}" style="display:none;">
       <span>${escapeHtml(String(fallbackLabel || "D").charAt(0).toUpperCase() || "D")}</span>
@@ -849,7 +857,7 @@ function renderVenueCardsHtml(groups) {
         <a class="${cardClass}" href="#/venue/${escapeHtml(venue.id || "")}" data-venue-id="${escapeHtml(venue.id || "")}">
           <div class="venue-media">
             ${isFeatured ? '<span class="featured-star">⭐</span>' : ""}
-            ${imageMarkup(primary.imageUrl || venue.imageUrl, venue.name || "Venue", "venue-card-image", venue.name || primary.title, "image-fallback-tall")}
+            ${imageMarkup(primary.imageUrl, venue.name || "Venue", "venue-card-image", venue.name || primary.title, "image-fallback-tall", venue.imageUrl)}
             <div class="venue-media-gradient"></div>
             <div class="venue-media-copy">
               ${statusPill(primary)}

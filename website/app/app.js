@@ -1173,7 +1173,7 @@ async function renderVenueDetail(venueId) {
         `;
       }).join("");
 
-      offersMarkup = instructionsMarkup + offerBlocks;
+      offersMarkup = offerBlocks + instructionsMarkup;
     }
 
     render(

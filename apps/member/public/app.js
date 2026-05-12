@@ -1444,6 +1444,7 @@ function onRouteChange() {
   }
 
   if (route.view === "venue") {
+    saveVenueListScroll();
     window.scrollTo(0, 0);
     renderVenueDetail(route.id);
     return;

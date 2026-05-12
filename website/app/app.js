@@ -842,7 +842,7 @@ function renderVenueCardsHtml(groups) {
         venue.neighborhood || venue.city,
         venueSignal(venue),
         priceLevelLabel(venue.priceLevel),
-        primary.isAvailableToday ? "Today" : getOfferAvailabilitySummary(primary)
+        primary.isAvailableToday ? null : getOfferAvailabilitySummary(primary)
       ].filter(Boolean);
       const when = isRedeemed && primary.redeemedAt
         ? `Redeemed ${escapeHtml(formatDateTime(primary.redeemedAt))}`
@@ -867,8 +867,7 @@ function renderVenueCardsHtml(groups) {
           </div>
           <div class="venue-card-body">
             <div class="venue-card-meta">${escapeHtml(metaParts.join(" | "))}</div>
-            <div class="venue-card-footer">
-              <div class="venue-card-address">${escapeHtml(venue.address || "Austin, TX")}</div>
+            <div class="venue-card-footer venue-card-footer-end">
               <div class="venue-card-arrow">${isRedeemed ? "Details" : "View"}</div>
             </div>
             ${when ? `<div class="venue-meta">${when}</div>` : ""}

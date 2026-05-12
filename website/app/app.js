@@ -1167,7 +1167,6 @@ async function renderVenueDetail(venueId) {
             <div class="section-kicker">${allOffers.length > 1 ? `Offer ${idx + 1} of ${allOffers.length}` : "Your offer"}</div>
             <div class="detail-offer-title">${escapeHtml(offer.title)}</div>
             ${offer.description ? `<div class="detail-offer-desc">${escapeHtml(offer.description)}</div>` : `<div class="detail-offer-desc">&nbsp;</div>`}
-            <div class="detail-window">${offer.isAvailableToday ? "Available today" : `Available on ${escapeHtml(getOfferAvailabilitySummary(offer))}`}</div>
             ${ctaMarkup}
           </section>
         `;

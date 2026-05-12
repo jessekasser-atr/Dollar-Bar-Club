@@ -867,7 +867,8 @@ function renderVenueCardsHtml(groups) {
           </div>
           <div class="venue-card-body">
             <div class="venue-card-meta">${escapeHtml(metaParts.join(" | "))}</div>
-            <div class="venue-card-footer venue-card-footer-end">
+            <div class="venue-card-footer">
+              <div class="venue-card-address">${escapeHtml([venue.city, venue.state].filter(Boolean).join(", ") || "Austin, TX")}</div>
               <div class="venue-card-arrow">${isRedeemed ? "Details" : "View"}</div>
             </div>
             ${when ? `<div class="venue-meta">${when}</div>` : ""}

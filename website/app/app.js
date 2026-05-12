@@ -330,7 +330,29 @@ function clearToken() {
   localStorage.removeItem("dbc_membershipToken");
 }
 
+let venueListScrollY = 0;
+let shouldRestoreVenueListScroll = false;
+
+function saveVenueListScroll() {
+  venueListScrollY = window.scrollY || window.pageYOffset || 0;
+}
+
+function restoreVenueListScroll() {
+  if (!shouldRestoreVenueListScroll) {
+    return;
+  }
+
+  shouldRestoreVenueListScroll = false;
+  window.requestAnimationFrame(() => {
+    window.scrollTo(0, venueListScrollY);
+  });
+}
+
 function navigate(hash) {
+  const currentRoute = getRoute();
+  if (currentRoute.view === "home" && /^#\/venue\//.test(String(hash || ""))) {
+    saveVenueListScroll();
+  }
   window.location.hash = hash;
 }
 
@@ -945,6 +967,7 @@ async function renderVenueList() {
           { compact: true, hideHero: true }
         )
       );
+      restoreVenueListScroll();
       return;
     }
 
@@ -1006,6 +1029,7 @@ async function renderVenueList() {
     );
 
     updateSearchCountLabel(filtered.length, venueGroups.length);
+    restoreVenueListScroll();
   } catch (error) {
     if (error.data?.reason === "membership_not_found") {
       clearToken();
@@ -1409,21 +1433,23 @@ function onGeoError(venue) {
 }
 
 function onRouteChange() {
-  window.scrollTo(0, 0);
   closeMenu();
   const token = getToken();
   const route = getRoute();
 
   if (!token) {
+    window.scrollTo(0, 0);
     renderOnboarding();
     return;
   }
 
   if (route.view === "venue") {
+    window.scrollTo(0, 0);
     renderVenueDetail(route.id);
     return;
   }
 
+  shouldRestoreVenueListScroll = true;
   renderVenueList();
 }
 

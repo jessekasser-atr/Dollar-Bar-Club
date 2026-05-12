@@ -1,4 +1,4 @@
-const CACHE_NAME = "dbc-member-shell-6e96472";
+const CACHE_NAME = "dbc-member-shell-62573e9";
 const SHELL_ASSETS = [
   "/",
   "/index.html",

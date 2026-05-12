@@ -756,16 +756,6 @@ async function handleLogin(event) {
   }
 }
 
-function statusPill(offer) {
-  if (offer.entitlementStatus === "redeemed") {
-    return `<span class="status-pill status-redeemed">Redeemed this week</span>`;
-  }
-  if (!offer.isAvailableToday) {
-    return `<span class="status-pill status-muted">Scheduled</span>`;
-  }
-  return `<span class="status-pill status-live">Available today</span>`;
-}
-
 function venueSignal(venue) {
   if (venue.openNow === true) {
     return "Open now";
@@ -839,16 +829,15 @@ function renderVenueCardsHtml(groups) {
       const isFeatured = venue.featured && !isRedeemed;
       const cardClass = `venue-card${isRedeemed ? " is-redeemed" : ""}${isFeatured ? " is-featured" : ""}`;
       const metaParts = [
-        venue.neighborhood || venue.city,
-        venueSignal(venue),
-        priceLevelLabel(venue.priceLevel),
-        primary.isAvailableToday ? null : getOfferAvailabilitySummary(primary)
+        venue.city || "Austin",
+        venue.neighborhood,
+        venue.type
       ].filter(Boolean);
-      const when = isRedeemed && primary.redeemedAt
-        ? `Redeemed ${escapeHtml(formatDateTime(primary.redeemedAt))}`
-        : !primary.isAvailableToday
-          ? `Available ${escapeHtml(getOfferAvailabilitySummary(primary))}`
-          : ``;
+      const availabilityLabel = isRedeemed
+        ? "Redeemed this week"
+        : primary.isAvailableToday
+          ? "Available today"
+          : `Available ${getOfferAvailabilitySummary(primary)}`;
       const offerLine = extra > 0
         ? `${escapeHtml(primary.title)} <span class="offer-more">+${extra} more</span>`
         : escapeHtml(primary.title);
@@ -860,7 +849,6 @@ function renderVenueCardsHtml(groups) {
             ${imageMarkup(primary.imageUrl, venue.name || "Venue", "venue-card-image", venue.name || primary.title, "image-fallback-tall", venue.imageUrl)}
             <div class="venue-media-gradient"></div>
             <div class="venue-media-copy">
-              ${statusPill(primary)}
               <h3>${escapeHtml(venue.name || "Venue")}</h3>
               <p>${offerLine}</p>
             </div>
@@ -868,10 +856,9 @@ function renderVenueCardsHtml(groups) {
           <div class="venue-card-body">
             <div class="venue-card-meta">${escapeHtml(metaParts.join(" | "))}</div>
             <div class="venue-card-footer">
-              <div class="venue-card-address">${escapeHtml([venue.city, venue.state].filter(Boolean).join(", ") || "Austin, TX")}</div>
+              <div class="venue-card-address">${escapeHtml(availabilityLabel)}</div>
               <div class="venue-card-arrow">${isRedeemed ? "Details" : "View"}</div>
             </div>
-            ${when ? `<div class="venue-meta">${when}</div>` : ""}
           </div>
         </a>
       `;

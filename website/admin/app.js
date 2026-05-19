@@ -275,10 +275,12 @@ async function sendPush() {
     ui.pushStatusEl.style.color = "var(--danger)";
     let reason = "send_failed";
     let message = null;
+    let httpStatus = null;
     try {
       const parsed = JSON.parse(String(error.message || "{}"));
       reason = parsed.reason || reason;
       message = parsed.message || null;
+      httpStatus = parsed.httpStatus != null ? parsed.httpStatus : null;
     } catch (_) { /* ignore */ }
     let label;
     if (reason === "apns_not_configured") {
@@ -287,11 +289,20 @@ async function sendPush() {
       label = `Send failed (APNs error): ${message || "unknown"}. Check Render logs for details.`;
     } else if (reason === "internal_error") {
       label = `Server error: ${message || "unknown"}. Check Render logs.`;
+    } else if (reason === "non_json_error") {
+      label = `The API (or a proxy) returned a non-JSON error page${httpStatus != null ? ` (HTTP ${httpStatus})` : ""}. ${message || "Open DevTools → Network, retry Send, and inspect the failing request."}`;
+    } else if (typeof reason === "string" && reason.startsWith("http_")) {
+      const code = reason.slice("http_".length);
+      label = `Request failed (HTTP ${code}): ${message || "Empty or generic error body. Check Render logs and the Network tab."}`;
     } else {
-      label = `Send failed: ${reason}`;
+      label = message
+        ? `Send failed (${reason}): ${message}`
+        : httpStatus != null
+          ? `Send failed (${reason}, HTTP ${httpStatus}). Check Render logs and APNs settings (e.g. APNS_PRODUCTION vs sandbox tokens).`
+          : `Send failed: ${reason}`;
     }
     ui.pushStatusEl.textContent = label;
-    renderResult(false, { ok: false, reason, message, error: String(error) });
+    renderResult(false, { ok: false, reason, message, httpStatus, error: String(error) });
   } finally {
     ui.pushSendBtn.disabled = false;
     ui.pushSendBtn.textContent = "Send now";
@@ -338,7 +349,27 @@ async function jsonFetch(path, init = {}) {
     headers
   });
 
-  const payload = await response.json().catch(() => ({}));
+  const rawText = await response.text();
+  let payload = {};
+  const trimmed = rawText.trim();
+  if (trimmed) {
+    try {
+      payload = JSON.parse(rawText);
+    } catch {
+      payload = {
+        ok: false,
+        reason: "non_json_error",
+        message: `HTTP ${response.status} ${response.statusText || ""} — ${trimmed.slice(0, 400)}`.trim()
+      };
+    }
+  } else if (!response.ok) {
+    payload = {
+      ok: false,
+      reason: `http_${response.status}`,
+      message: response.statusText || "Empty error body (often a proxy or gateway in front of the API)."
+    };
+  }
+
   if (!response.ok) {
     if (payload.reason === "admin_access_required" || payload.reason === "admin_access_not_configured") {
       adminAccessKey = "";
@@ -348,7 +379,15 @@ async function jsonFetch(path, init = {}) {
         : "Your admin session is no longer valid. Enter the current access key to continue.");
       throw new Error(payload.reason);
     }
-    throw new Error(JSON.stringify(payload));
+    const enriched = {
+      ...payload,
+      httpStatus: response.status,
+      ...(payload.reason ? {} : { reason: `http_${response.status}` }),
+      ...(payload.message == null && response.statusText
+        ? { message: response.statusText }
+        : {})
+    };
+    throw new Error(JSON.stringify(enriched));
   }
   return payload;
 }

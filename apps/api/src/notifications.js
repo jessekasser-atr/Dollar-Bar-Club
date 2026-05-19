@@ -14,6 +14,12 @@ import http2 from "node:http2";
 const PROD_HOST = "api.push.apple.com";
 const SANDBOX_HOST = "api.sandbox.push.apple.com";
 const JWT_TTL_MS = 50 * 60 * 1000; // Apple requires tokens be refreshed at least every hour.
+const REQUEST_TIMEOUT_MS = 10_000;
+// APNs frequently drops idle HTTP/2 sessions silently (no GOAWAY/close/error
+// event), so we proactively rotate the cached connection rather than trusting
+// it indefinitely.
+const SESSION_MAX_AGE_MS = 15 * 60 * 1000;
+const SESSION_IDLE_LIMIT_MS = 5 * 60 * 1000;
 
 function getConfig() {
   const rawKey = process.env.APNS_AUTH_KEY || "";
@@ -108,6 +114,13 @@ function isSessionUsable(session) {
   return true;
 }
 
+function isSessionFresh(client) {
+  const now = Date.now();
+  if (now - client.createdAt > SESSION_MAX_AGE_MS) return false;
+  if (now - client.lastUsedAt > SESSION_IDLE_LIMIT_MS) return false;
+  return true;
+}
+
 function resetClient() {
   if (cachedClient) {
     try { cachedClient.session.destroy(); } catch (_) { /* ignore */ }
@@ -117,7 +130,8 @@ function resetClient() {
 
 function getClient(config) {
   const host = config.production ? PROD_HOST : SANDBOX_HOST;
-  if (cachedClient && cachedClient.host === host && isSessionUsable(cachedClient.session)) {
+  if (cachedClient && cachedClient.host === host && isSessionUsable(cachedClient.session) && isSessionFresh(cachedClient)) {
+    cachedClient.lastUsedAt = Date.now();
     return cachedClient.session;
   }
   resetClient();
@@ -125,7 +139,8 @@ function getClient(config) {
   session.on("error", () => { resetClient(); });
   session.on("close", () => { resetClient(); });
   session.on("goaway", () => { resetClient(); });
-  cachedClient = { host, session };
+  const now = Date.now();
+  cachedClient = { host, session, createdAt: now, lastUsedAt: now };
   return session;
 }
 
@@ -138,6 +153,18 @@ function sendOne({ config, session, deviceToken, payload }) {
       resolve({ ok: false, deviceToken, status: 0, reason: `jwt_error:${err?.message || "unknown"}` });
       return;
     }
+
+    let settled = false;
+    let timeoutHandle = null;
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = null;
+      }
+      resolve(result);
+    };
 
     let req;
     try {
@@ -153,6 +180,16 @@ function sendOne({ config, session, deviceToken, payload }) {
         "content-length": Buffer.byteLength(body)
       });
 
+      // A stale APNs session can silently swallow a request: req.end() returns
+      // and no response/data/end/error ever fires. Without this timeout the
+      // promise hangs, Promise.all hangs, and the upstream proxy times out
+      // returning an HTML error page that the admin UI can't decode.
+      timeoutHandle = setTimeout(() => {
+        try { req.close(http2.constants.NGHTTP2_CANCEL); } catch (_) { /* ignore */ }
+        resetClient();
+        settle({ ok: false, deviceToken, status: 0, reason: "request_timeout" });
+      }, REQUEST_TIMEOUT_MS);
+
       let status = 0;
       let responseBody = "";
 
@@ -162,15 +199,15 @@ function sendOne({ config, session, deviceToken, payload }) {
       req.on("data", (chunk) => { responseBody += chunk.toString(); });
       req.on("end", () => {
         if (status === 200) {
-          resolve({ ok: true, deviceToken, status });
+          settle({ ok: true, deviceToken, status });
           return;
         }
         let reason = "unknown";
         try { reason = JSON.parse(responseBody || "{}").reason || reason; } catch (_) { /* ignore */ }
-        resolve({ ok: false, deviceToken, status, reason });
+        settle({ ok: false, deviceToken, status, reason });
       });
       req.on("error", (err) => {
-        resolve({ ok: false, deviceToken, status: 0, reason: err?.code || "request_error" });
+        settle({ ok: false, deviceToken, status: 0, reason: err?.code || "request_error" });
       });
 
       req.end(body);
@@ -179,7 +216,7 @@ function sendOne({ config, session, deviceToken, payload }) {
       // between our usability check and the call. Tear down the cache so the
       // next attempt reconnects, and surface a structured error.
       resetClient();
-      resolve({ ok: false, deviceToken, status: 0, reason: `session_error:${err?.code || err?.message || "unknown"}` });
+      settle({ ok: false, deviceToken, status: 0, reason: `session_error:${err?.code || err?.message || "unknown"}` });
     }
   });
 }
@@ -221,13 +258,15 @@ async function sendApnsNotification({ devices, alert, data = {} }) {
 
     let results = await sendBatchOnce({ config, devices, payload });
 
-    // If every send failed with a session_error, the cached HTTP/2 connection
-    // was stale (idle timeout, GOAWAY, etc.). Reset and try once more so the
-    // user doesn't have to click Send twice.
-    const allSessionErrors = results.length > 0 && results.every((r) =>
-      !r.ok && typeof r.reason === "string" && r.reason.startsWith("session_error")
+    // If every send failed with a stale-connection symptom — synchronous
+    // session_error throws OR request_timeout hangs — the cached HTTP/2
+    // connection is dead. Reset and try once more so the user doesn't have
+    // to click Send twice.
+    const allStaleSession = results.length > 0 && results.every((r) =>
+      !r.ok && typeof r.reason === "string" &&
+      (r.reason.startsWith("session_error") || r.reason === "request_timeout")
     );
-    if (allSessionErrors) {
+    if (allStaleSession) {
       resetClient();
       results = await sendBatchOnce({ config, devices, payload });
     }

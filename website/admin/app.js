@@ -635,10 +635,55 @@ function isOfferExpired(offer) {
   return Number.isFinite(endsAtMs) && endsAtMs < Date.now();
 }
 
+function getInferredActiveWindow(offer) {
+  const rawStart = offer?.startsAt ? new Date(offer.startsAt) : null;
+  const rawEnd = offer?.endsAt ? new Date(offer.endsAt) : null;
+  if (
+    !rawStart || Number.isNaN(rawStart.getTime()) ||
+    !rawEnd || Number.isNaN(rawEnd.getTime())
+  ) {
+    return { startsAt: rawStart, endsAt: rawEnd };
+  }
+
+  const currentYear = new Date().getFullYear();
+  const startsAt = new Date(
+    currentYear,
+    rawStart.getMonth(),
+    rawStart.getDate(),
+    rawStart.getHours(),
+    rawStart.getMinutes()
+  );
+  const startPosition = Date.UTC(
+    2000,
+    rawStart.getMonth(),
+    rawStart.getDate(),
+    rawStart.getHours(),
+    rawStart.getMinutes()
+  );
+  const endPosition = Date.UTC(
+    2000,
+    rawEnd.getMonth(),
+    rawEnd.getDate(),
+    rawEnd.getHours(),
+    rawEnd.getMinutes()
+  );
+  const endYear = endPosition < startPosition ? currentYear + 1 : currentYear;
+  const endsAt = new Date(
+    endYear,
+    rawEnd.getMonth(),
+    rawEnd.getDate(),
+    rawEnd.getHours(),
+    rawEnd.getMinutes()
+  );
+
+  return { startsAt, endsAt };
+}
+
 function offerAdminCard(offer) {
   const wrap = document.createElement("div");
   wrap.className = "offer";
   const expired = isOfferExpired(offer);
+  const inferredWindow = getInferredActiveWindow(offer);
   const scheduledPill = expired
     ? `<span class="pill" style="background:#fde2e2;color:#c62828;">Expired ${escapeHtml(offer.endsAt ? new Date(offer.endsAt).toLocaleDateString() : "")}</span>`
     : `<span class="pill pill-accent">${escapeHtml((offer.isAvailableNow ?? offer.isAvailableToday) ? "Available Now" : "Scheduled")}</span>`;
@@ -657,8 +702,8 @@ function offerAdminCard(offer) {
     <p style="margin-top:6px;color:#5c6675;">
       <strong>Available:</strong> ${escapeHtml(formatOfferSchedule(offer))} |
       <strong>Redemption:</strong> ${escapeHtml(formatRedemptionCadence(offer.redemptionCadence))} |
-      <strong>Window:</strong> ${escapeHtml(offer.startsAt ? new Date(offer.startsAt).toLocaleDateString() : "—")}
-      &rarr; ${escapeHtml(offer.endsAt ? new Date(offer.endsAt).toLocaleDateString() : "—")}
+      <strong>Window:</strong> ${escapeHtml(inferredWindow.startsAt ? inferredWindow.startsAt.toLocaleDateString() : "—")}
+      &rarr; ${escapeHtml(inferredWindow.endsAt ? inferredWindow.endsAt.toLocaleDateString() : "—")}
     </p>
   `;
 
@@ -725,15 +770,15 @@ function offerAdminCard(offer) {
     cadenceSelect.style.cssText = "width:100%;margin-bottom:6px;padding:4px 6px;";
 
     const windowLabel = document.createElement("div");
-    windowLabel.textContent = "Active window (local time)";
+    windowLabel.textContent = "Active window (current year; end rolls into next year when needed)";
     windowLabel.style.cssText = "margin:8px 0 6px;font-size:12px;font-weight:600;color:#5c6675;";
 
     const windowRow = document.createElement("div");
     windowRow.style.cssText = "display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;";
 
-    const toDatetimeLocal = (isoString) => {
-      if (!isoString) return "";
-      const d = new Date(isoString);
+    const toDatetimeLocal = (value) => {
+      if (!value) return "";
+      const d = value instanceof Date ? value : new Date(value);
       if (Number.isNaN(d.getTime())) return "";
       const pad = (n) => String(n).padStart(2, "0");
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -741,26 +786,34 @@ function offerAdminCard(offer) {
 
     const startsInput = document.createElement("input");
     startsInput.type = "datetime-local";
-    startsInput.value = toDatetimeLocal(offer.startsAt);
+    startsInput.value = toDatetimeLocal(inferredWindow.startsAt);
     startsInput.style.cssText = "flex:1;min-width:180px;padding:4px 6px;";
 
     const endsInput = document.createElement("input");
     endsInput.type = "datetime-local";
-    endsInput.value = toDatetimeLocal(offer.endsAt);
+    endsInput.value = toDatetimeLocal(inferredWindow.endsAt);
     endsInput.style.cssText = "flex:1;min-width:180px;padding:4px 6px;";
 
-    const neverExpireBtn = document.createElement("button");
-    neverExpireBtn.type = "button";
-    neverExpireBtn.className = "secondary";
-    neverExpireBtn.textContent = "Never expires";
-    neverExpireBtn.style.cssText = "font-size:12px;padding:4px 8px;";
-    neverExpireBtn.addEventListener("click", () => {
-      endsInput.value = toDatetimeLocal("2099-12-31T23:59:59.000Z");
+    const oneYearBtn = document.createElement("button");
+    oneYearBtn.type = "button";
+    oneYearBtn.className = "secondary";
+    oneYearBtn.textContent = "One-year window";
+    oneYearBtn.style.cssText = "font-size:12px;padding:4px 8px;";
+    oneYearBtn.addEventListener("click", () => {
+      const start = startsInput.value ? new Date(startsInput.value) : null;
+      if (!start || Number.isNaN(start.getTime())) {
+        startsInput.focus();
+        return;
+      }
+      const end = new Date(start);
+      end.setFullYear(end.getFullYear() + 1);
+      end.setMinutes(end.getMinutes() - 1);
+      endsInput.value = toDatetimeLocal(end);
     });
 
     windowRow.appendChild(startsInput);
     windowRow.appendChild(endsInput);
-    windowRow.appendChild(neverExpireBtn);
+    windowRow.appendChild(oneYearBtn);
 
     titleEl.replaceWith(titleInput);
     descEl.replaceWith(descInput);

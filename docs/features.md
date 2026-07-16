@@ -103,8 +103,10 @@ Redemption requires the member to be physically at the venue. Tapping the redeem
 
 ### Redemption
 
-- Each member gets **one redemption per venue** (single-use entitlement).
-- On successful geolocation verification, the API validates and records the redemption.
+- Each offer is configured as either **once per member each Austin week** or **once per member ever**.
+- Offers may be limited to selected Austin weekdays and an optional recurring daily time window.
+- Overnight windows are supported and belong to the weekday on which the window starts.
+- On successful geolocation verification, the API validates the current schedule and redemption limit, then records the redemption.
 - Confirmation screen: clear success message with the redeemed offer details.
 
 ### Redeemed state — List view
@@ -115,7 +117,7 @@ Redemption requires the member to be physically at the venue. Tapping the redeem
 
 ### Redeemed state — Detail view
 
-- Redeem CTA is replaced with a "Redeemed" confirmation block (date/time of redemption).
+- Redeem CTA is replaced with a "Redeemed" confirmation block (date/time of redemption and whether the offer resets weekly or never resets).
 - Offer details remain visible for reference.
 - All venue info (directions, phone, socials) stays accessible.
 

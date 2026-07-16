@@ -596,6 +596,42 @@ function getOfferAvailabilitySummary(offer) {
   return offer?.availabilitySummary || "Every day";
 }
 
+function getOfferAvailabilitySentence(offer) {
+  return getOfferAvailabilitySummary(offer).replace(/^Every day/, "every day");
+}
+
+function isOfferAvailableNow(offer) {
+  return offer?.isAvailableNow ?? offer?.isAvailableToday ?? false;
+}
+
+function isOneTimeOffer(offer) {
+  return offer?.redemptionCadence === "once";
+}
+
+function getOfferRedemptionRule(offer) {
+  return isOneTimeOffer(offer) ? "One-time member offer" : "Redeemable once per week";
+}
+
+function getRedeemedStatusLabel(offer) {
+  return isOneTimeOffer(offer) ? "One-time offer redeemed" : "Redeemed this week";
+}
+
+function getUnavailableOfferState(offer) {
+  if (offer?.availabilityState === "later_today") {
+    return { heading: "Available later today", detail: `Available ${getOfferAvailabilitySentence(offer)}.` };
+  }
+  if (offer?.availabilityState === "ended_today") {
+    return { heading: "Ended for today", detail: `Available ${getOfferAvailabilitySentence(offer)}.` };
+  }
+  if (offer?.availabilityState === "offer_ended") {
+    return { heading: "Offer ended", detail: "This special is no longer available." };
+  }
+  if (offer?.availabilityState === "not_started") {
+    return { heading: "Coming soon", detail: `Available ${getOfferAvailabilitySentence(offer)}.` };
+  }
+  return { heading: "Not available now", detail: `Available ${getOfferAvailabilitySentence(offer)}.` };
+}
+
 function venueFallbackMarkup(label, sizeClass = "") {
   const initial = escapeHtml(String(label || "DBC").charAt(0).toUpperCase() || "D");
   return `
@@ -801,7 +837,7 @@ function chooseVenueOffer(currentOffer, nextOffer) {
   }
 
   const priority = (offer) => {
-    if (offer.entitlementStatus !== "redeemed" && offer.isAvailableToday) return 2;
+    if (offer.entitlementStatus !== "redeemed" && isOfferAvailableNow(offer)) return 2;
     if (offer.entitlementStatus !== "redeemed") return 1;
     return 0;
   };
@@ -830,7 +866,7 @@ function getVenueCounts(offers) {
     (counts, offer) => {
       if (offer.entitlementStatus === "redeemed") {
         counts.redeemed += 1;
-      } else if (offer.isAvailableToday) {
+      } else if (isOfferAvailableNow(offer)) {
         counts.live += 1;
       } else {
         counts.scheduled += 1;
@@ -856,10 +892,10 @@ function renderVenueCardsHtml(groups) {
         venue.type
       ].filter(Boolean);
       const availabilityLabel = isRedeemed
-        ? "Redeemed this week"
-        : primary.isAvailableToday
-          ? "Available today"
-          : `Available ${getOfferAvailabilitySummary(primary)}`;
+        ? (extra > 0 ? "Offers redeemed" : getRedeemedStatusLabel(primary))
+        : isOfferAvailableNow(primary)
+          ? "Available now"
+          : getUnavailableOfferState(primary).heading;
       const offerLine = extra > 0
         ? `${escapeHtml(primary.title)} <span class="offer-more">+${extra} more</span>`
         : escapeHtml(primary.title);
@@ -985,14 +1021,14 @@ async function renderVenueList() {
 
     venueGroups.forEach((group) => {
       group.offers.sort((a, b) => {
-        const aScore = a.entitlementStatus !== "redeemed" && a.isAvailableToday ? 2 : a.entitlementStatus !== "redeemed" ? 1 : 0;
-        const bScore = b.entitlementStatus !== "redeemed" && b.isAvailableToday ? 2 : b.entitlementStatus !== "redeemed" ? 1 : 0;
+        const aScore = a.entitlementStatus !== "redeemed" && isOfferAvailableNow(a) ? 2 : a.entitlementStatus !== "redeemed" ? 1 : 0;
+        const bScore = b.entitlementStatus !== "redeemed" && isOfferAvailableNow(b) ? 2 : b.entitlementStatus !== "redeemed" ? 1 : 0;
         if (aScore !== bScore) return bScore - aScore;
         return Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0);
       });
       group.primary = group.offers[0];
       group.allRedeemed = group.offers.every((o) => o.entitlementStatus === "redeemed");
-      group.hasRedeemableToday = group.offers.some((o) => o.entitlementStatus !== "redeemed" && o.isAvailableToday);
+      group.hasRedeemableToday = group.offers.some((o) => o.entitlementStatus !== "redeemed" && isOfferAvailableNow(o));
       group.hasScheduledOnly = !group.hasRedeemableToday && group.offers.some((o) => o.entitlementStatus !== "redeemed");
     });
 
@@ -1126,7 +1162,7 @@ async function renderVenueDetail(venueId) {
       if (aR !== bR) return aR - bR;
       return Date.parse(b.endsAt || 0) - Date.parse(a.endsAt || 0);
     });
-    const hasLiveOffers = allOffers.some((o) => o.entitlementStatus !== "redeemed" && o.isAvailableToday);
+    const hasLiveOffers = allOffers.some((o) => o.entitlementStatus !== "redeemed" && isOfferAvailableNow(o));
     const mapsUrl = `https://maps.google.com/maps?q=${encodeURIComponent(venue.address || `${venue.name}, Austin, TX`)}`;
     const infoMarkup = buildDetailInfo(venue);
     const hoursMarkup = formatHoursSummary(venue.hoursSummary);
@@ -1153,7 +1189,7 @@ async function renderVenueDetail(venueId) {
           <div class="cta-panel">
             <div>
               <div class="cta-label">When you're there</div>
-              <p>${escapeHtml(`Each special can be redeemed once per week. ${weeklyResetLabel}.`)}</p>
+              <p>Each special shows whether it resets weekly or can only be used once.</p>
               <ol class="redeem-steps">
                 <li>Tap Redeem below</li>
                 <li>Show the screen to your bartender/server</li>
@@ -1167,19 +1203,23 @@ async function renderVenueDetail(venueId) {
       const offerBlocks = allOffers.map((offer, idx) => {
         const isRedeemed = offer.entitlementStatus === "redeemed";
         const when = offer.redeemedAt ? formatDateTime(offer.redeemedAt) : "";
+        const unavailableState = getUnavailableOfferState(offer);
         let ctaMarkup = "";
         if (isRedeemed) {
+          const redeemedDetail = isOneTimeOffer(offer)
+            ? (when ? `Used ${when}. This one-time offer does not reset.` : "This one-time offer does not reset.")
+            : (when ? `Used ${when}. ${weeklyResetLabel}.` : weeklyResetLabel);
           ctaMarkup = `
             <div class="info-banner success-banner" style="margin-top:10px;">
-              <strong>Redeemed this week</strong>
-              <span>${escapeHtml(when ? `Used ${when}. ${weeklyResetLabel}.` : weeklyResetLabel)}</span>
+              <strong>${escapeHtml(getRedeemedStatusLabel(offer))}</strong>
+              <span>${escapeHtml(redeemedDetail)}</span>
             </div>
           `;
-        } else if (!offer.isAvailableToday) {
+        } else if (!isOfferAvailableNow(offer)) {
           ctaMarkup = `
             <div class="info-banner muted-banner" style="margin-top:10px;">
-              <strong>Not available today</strong>
-              <span>${escapeHtml(`This special is only available on ${getOfferAvailabilitySummary(offer)}.`)}</span>
+              <strong>${escapeHtml(unavailableState.heading)}</strong>
+              <span>${escapeHtml(unavailableState.detail)}</span>
             </div>
           `;
         } else {
@@ -1191,6 +1231,7 @@ async function renderVenueDetail(venueId) {
             <div class="section-kicker">${allOffers.length > 1 ? `Offer ${idx + 1} of ${allOffers.length}` : "Your offer"}</div>
             <div class="detail-offer-title">${escapeHtml(offer.title)}</div>
             ${offer.description ? `<div class="detail-offer-desc">${escapeHtml(offer.description)}</div>` : `<div class="detail-offer-desc">&nbsp;</div>`}
+            <div class="detail-offer-desc">${escapeHtml(`${getOfferRedemptionRule(offer)} · ${getOfferAvailabilitySummary(offer)}`)}</div>
             ${ctaMarkup}
           </section>
         `;
@@ -1360,10 +1401,17 @@ async function onGeoSuccess(position, venue, offer) {
 
     if (redemption.duplicate) {
       const redeemedLabel = redemption.redeemedAt ? formatDateTime(redemption.redeemedAt) : "";
+      const duplicateMessage = isOneTimeOffer(offer)
+        ? (redeemedLabel
+            ? `This one-time offer was already redeemed on ${redeemedLabel}. It does not reset.`
+            : "This one-time offer has already been redeemed and does not reset.")
+        : (redeemedLabel
+            ? `This offer was already redeemed on ${redeemedLabel}. ${getWeeklyResetLabel(redemption.weeklyReset)}.`
+            : `This offer has already been redeemed this week. ${getWeeklyResetLabel(redemption.weeklyReset)}.`);
       showModal(`
         <div class="modal-icon modal-icon-success">OK</div>
         <h3 class="modal-success">Already redeemed</h3>
-        <p>${escapeHtml(redeemedLabel ? `This offer was already redeemed on ${redeemedLabel}. ${getWeeklyResetLabel(redemption.weeklyReset)}.` : `This offer has already been redeemed this week. ${getWeeklyResetLabel(redemption.weeklyReset)}.`)}</p>
+        <p>${escapeHtml(duplicateMessage)}</p>
         <button class="btn btn-primary" id="modal-done-btn">Back to venue</button>
       `);
 
@@ -1374,10 +1422,13 @@ async function onGeoSuccess(position, venue, offer) {
       return;
     }
 
+    const successResetMessage = isOneTimeOffer(offer)
+      ? "This is a one-time member offer and will not reset."
+      : `${getWeeklyResetLabel(redemption.weeklyReset)}.`;
     showModal(`
       <div class="modal-icon modal-icon-success">OK</div>
       <h3 class="modal-success">Offer redeemed</h3>
-      <p>${escapeHtml(`Your ${offer.title} at ${venue.name} is ready. Show this screen to your bartender. ${getWeeklyResetLabel(redemption.weeklyReset)}.`)}</p>
+      <p>${escapeHtml(`Your ${offer.title} at ${venue.name} is ready. Show this screen to your bartender. ${successResetMessage}`)}</p>
       <button class="btn btn-primary" id="modal-done-btn">Done</button>
     `);
 
@@ -1407,7 +1458,7 @@ async function onGeoSuccess(position, venue, offer) {
     if (reason === "offer_inactive") {
       message = "This offer is no longer live. Head back to the venue list to see the latest available offers.";
     } else if (reason === "offer_unavailable_today") {
-      message = `This special is not available today. It is only available on ${getOfferAvailabilitySummary(offer)}.`;
+      message = `This special is not available right now. It is available ${getOfferAvailabilitySentence(offer)}.`;
     } else if (reason === "entitlement_missing") {
       message = "This offer is not available on your membership.";
     } else if (reason === "venue_mismatch") {

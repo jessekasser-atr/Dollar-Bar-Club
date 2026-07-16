@@ -6,12 +6,19 @@ import { fileURLToPath } from "node:url";
 import { fetchBarsByCity, mapBarToVenueRecord } from "./barglance.js";
 import { getCatalogSnapshot } from "./catalog.js";
 import { runMigrations } from "./migrations.js";
+import {
+  AUSTIN_TIME_ZONE,
+  getOfferAvailability,
+  getZonedDateParts,
+  normalizeAvailableDays,
+  normalizeEntitlementForCadence,
+  normalizeRedemptionCadence
+} from "./offer-rules.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const DATA_DIR = path.join(REPO_ROOT, "data");
 const DB_PATH = path.join(DATA_DIR, "dbc.sqlite");
-const AUSTIN_TIME_ZONE = "America/Chicago";
 const WEEKDAY_TO_INDEX = {
   Sun: 0,
   Mon: 1,
@@ -21,37 +28,8 @@ const WEEKDAY_TO_INDEX = {
   Fri: 5,
   Sat: 6
 };
-const WEEKDAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
 function nowIso() {
   return new Date().toISOString();
-}
-
-function getZonedDateParts(date, timeZone = AUSTIN_TIME_ZONE) {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23"
-  });
-
-  const parts = formatter.formatToParts(date);
-  const get = (type) => parts.find((part) => part.type === type)?.value;
-
-  return {
-    year: Number(get("year")),
-    month: Number(get("month")),
-    day: Number(get("day")),
-    weekday: get("weekday"),
-    hour: Number(get("hour")),
-    minute: Number(get("minute")),
-    second: Number(get("second"))
-  };
 }
 
 function getTimeZoneOffsetMs(date, timeZone = AUSTIN_TIME_ZONE) {
@@ -110,18 +88,6 @@ function createEntitlementToken() {
   return crypto.randomBytes(8).toString("hex").toUpperCase();
 }
 
-function normalizeAvailableDays(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return [...new Set(
-    value
-      .map((entry) => Number(entry))
-      .filter((entry) => Number.isInteger(entry) && entry >= 0 && entry <= 6)
-  )].sort((left, right) => left - right);
-}
-
 function serializeAvailableDays(value) {
   const days = normalizeAvailableDays(value);
   return days.length ? days.join(",") : null;
@@ -133,37 +99,6 @@ function parseAvailableDays(value) {
   }
 
   return normalizeAvailableDays(String(value).split(","));
-}
-
-function formatAvailabilitySummary(availableDays) {
-  const days = normalizeAvailableDays(availableDays);
-  if (!days.length) {
-    return "Every day";
-  }
-
-  return days.map((day) => WEEKDAY_LABELS[day]).join(", ");
-}
-
-function getAustinWeekdayIndex(referenceDate = new Date()) {
-  const local = getZonedDateParts(referenceDate, AUSTIN_TIME_ZONE);
-  return WEEKDAY_TO_INDEX[local.weekday] ?? 0;
-}
-
-function getOfferAvailability(offer, referenceDate = new Date()) {
-  const startsAtMs = offer.startsAt ? Date.parse(offer.startsAt) : Number.NaN;
-  const endsAtMs = offer.endsAt ? Date.parse(offer.endsAt) : Number.NaN;
-  const referenceMs = referenceDate.getTime();
-  const withinStart = !Number.isFinite(startsAtMs) || referenceMs >= startsAtMs;
-  const withinEnd = !Number.isFinite(endsAtMs) || referenceMs <= endsAtMs;
-  const availableDays = normalizeAvailableDays(offer.availableDays);
-  const weekdayIndex = getAustinWeekdayIndex(referenceDate);
-  const matchesDay = !availableDays.length || availableDays.includes(weekdayIndex);
-
-  return {
-    availableDays,
-    availabilitySummary: formatAvailabilitySummary(availableDays),
-    isAvailableToday: Boolean(offer.isActive) && withinStart && withinEnd && matchesDay
-  };
 }
 
 function slugify(value) {
@@ -238,22 +173,26 @@ function mapVenue(row) {
 }
 
 function mapOffer(row) {
+  if (!row) {
+    return null;
+  }
+
   const availableDays = parseAvailableDays(row.available_days);
-  return row
-    ? {
-        id: row.id,
-        venueId: row.venue_id,
-        title: row.title,
-        description: row.description,
-        imageUrl: row.image_url,
-        startsAt: row.starts_at,
-        endsAt: row.ends_at,
-        isActive: Boolean(row.is_active),
-        availableDays,
-        availabilitySummary: formatAvailabilitySummary(availableDays),
-        createdAt: row.created_at
-      }
-    : null;
+  return {
+    id: row.id,
+    venueId: row.venue_id,
+    title: row.title,
+    description: row.description,
+    imageUrl: row.image_url,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    isActive: Boolean(row.is_active),
+    availableDays,
+    availableStartTime: row.available_start_time || null,
+    availableEndTime: row.available_end_time || null,
+    redemptionCadence: normalizeRedemptionCadence(row.redemption_cadence),
+    createdAt: row.created_at
+  };
 }
 
 function mapMembership(row) {
@@ -281,24 +220,13 @@ function mapEntitlement(row) {
     : null;
 }
 
-function normalizeEntitlement(entitlement, referenceDate = new Date()) {
-  if (!entitlement) {
-    return null;
-  }
-
+function normalizeEntitlement(entitlement, redemptionCadence, referenceDate = new Date()) {
   const resetInfo = getWeeklyResetInfo(referenceDate);
-  const redeemedAtMs = entitlement.redeemedAt ? Date.parse(entitlement.redeemedAt) : Number.NaN;
-  const currentWeekStartMs = Date.parse(resetInfo.currentWeekStartAt);
-  const redeemedThisWeek =
-    entitlement.status === "redeemed" &&
-    Number.isFinite(redeemedAtMs) &&
-    redeemedAtMs >= currentWeekStartMs;
-
-  return {
-    ...entitlement,
-    status: redeemedThisWeek ? "redeemed" : "issued",
-    redeemedAt: redeemedThisWeek ? entitlement.redeemedAt : null
-  };
+  return normalizeEntitlementForCadence(
+    entitlement,
+    redemptionCadence,
+    resetInfo.currentWeekStartAt
+  );
 }
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -348,9 +276,11 @@ const upsertVenueStmt = db.prepare(`
 
 const insertOfferStmt = db.prepare(`
   INSERT OR IGNORE INTO offers (
-    id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days
+    id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days,
+    available_start_time, available_end_time, redemption_cadence
   ) VALUES (
-    @id, @venueId, @title, @description, @imageUrl, @startsAt, @endsAt, @isActive, @availableDays
+    @id, @venueId, @title, @description, @imageUrl, @startsAt, @endsAt, @isActive, @availableDays,
+    @availableStartTime, @availableEndTime, @redemptionCadence
   )
 `);
 
@@ -377,7 +307,10 @@ const seedDb = db.transaction(() => {
     insertOfferStmt.run({
       ...offer,
       isActive: offer.isActive ? 1 : 0,
-      availableDays: serializeAvailableDays(offer.availableDays)
+      availableDays: serializeAvailableDays(offer.availableDays),
+      availableStartTime: offer.availableStartTime || null,
+      availableEndTime: offer.availableEndTime || null,
+      redemptionCadence: normalizeRedemptionCadence(offer.redemptionCadence)
     });
   }
 });
@@ -449,6 +382,9 @@ const listActiveOffersStmt = db.prepare(`
     o.ends_at,
     o.is_active,
     o.available_days,
+    o.available_start_time,
+    o.available_end_time,
+    o.redemption_cadence,
     o.created_at,
     v.id AS venue_id_join,
     v.source AS venue_source,
@@ -538,7 +474,8 @@ const clearVenueProfileStmt = db.prepare(`
 `);
 
 const listVenueActiveOffersStmt = db.prepare(`
-  SELECT id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days, created_at
+  SELECT id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days,
+         available_start_time, available_end_time, redemption_cadence, created_at
   FROM offers
   WHERE venue_id = ?
     AND is_active = 1
@@ -556,6 +493,9 @@ const listOffersStmt = db.prepare(`
     o.ends_at,
     o.is_active,
     o.available_days,
+    o.available_start_time,
+    o.available_end_time,
+    o.redemption_cadence,
     o.created_at,
     COALESCE(v.display_name, v.name) AS venue_name
   FROM offers o
@@ -564,16 +504,18 @@ const listOffersStmt = db.prepare(`
 `);
 
 const findOfferByIdStmt = db.prepare(`
-  SELECT id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days, created_at
+  SELECT id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days,
+         available_start_time, available_end_time, redemption_cadence, created_at
   FROM offers
   WHERE id = ?
 `);
 
 const insertOfferRecordStmt = db.prepare(`
   INSERT INTO offers (
-    id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days, created_at
+    id, venue_id, title, description, image_url, starts_at, ends_at, is_active, available_days,
+    available_start_time, available_end_time, redemption_cadence, created_at
   ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
   )
 `);
 
@@ -585,7 +527,8 @@ const updateOfferActiveStmt = db.prepare(`
 
 const updateOfferContentStmt = db.prepare(`
   UPDATE offers
-  SET title = ?, description = ?, available_days = ?
+  SET title = ?, description = ?, available_days = ?, available_start_time = ?,
+      available_end_time = ?, redemption_cadence = ?
   WHERE id = ?
 `);
 
@@ -792,13 +735,14 @@ function getActiveOffers({ venueId = null, membershipToken = null } = {}) {
 
   return offers.map((offer) => {
     const entitlement = normalizeEntitlement(
-      mapEntitlement(findEntitlementStmt.get(membership.memberId, offer.id))
+      mapEntitlement(findEntitlementStmt.get(membership.memberId, offer.id)),
+      offer.redemptionCadence
     );
     return {
       ...offer,
       entitlementStatus: entitlement?.status ?? "missing",
       redeemedAt: entitlement?.redeemedAt ?? null,
-      nextResetAt: resetInfo.nextResetAt
+      nextResetAt: offer.redemptionCadence === "weekly" ? resetInfo.nextResetAt : null
     };
   });
 }
@@ -862,6 +806,9 @@ const createOfferTxn = db.transaction((offerInput) => {
     offerInput.endsAt,
     offerInput.isActive ? 1 : 0,
     serializeAvailableDays(offerInput.availableDays),
+    offerInput.availableStartTime || null,
+    offerInput.availableEndTime || null,
+    normalizeRedemptionCadence(offerInput.redemptionCadence),
     createdAt
   );
 
@@ -918,13 +865,14 @@ function getVenueOffers(venueId, membershipToken = null) {
     membership,
     offers: offers.map((offer) => {
       const entitlement = normalizeEntitlement(
-        mapEntitlement(findEntitlementStmt.get(membership.memberId, offer.id))
+        mapEntitlement(findEntitlementStmt.get(membership.memberId, offer.id)),
+        offer.redemptionCadence
       );
       return {
         ...offer,
         entitlementStatus: entitlement?.status ?? "missing",
         redeemedAt: entitlement?.redeemedAt ?? null,
-        nextResetAt: resetInfo.nextResetAt
+        nextResetAt: offer.redemptionCadence === "weekly" ? resetInfo.nextResetAt : null
       };
     })
   };
@@ -989,7 +937,7 @@ const redeemTxn = db.transaction(({ membershipToken, offerId, venueId, staffId, 
     return { ok: false, statusCode: 400, reason: "offer_inactive" };
   }
 
-  if (!getOfferAvailability(offer).isAvailableToday) {
+  if (!getOfferAvailability(offer).isAvailableNow) {
     logRedemptionEvent({
       memberId: membership.memberId,
       membershipToken,
@@ -1004,7 +952,8 @@ const redeemTxn = db.transaction(({ membershipToken, offerId, venueId, staffId, 
   }
 
   const entitlement = normalizeEntitlement(
-    mapEntitlement(findEntitlementStmt.get(membership.memberId, offerId))
+    mapEntitlement(findEntitlementStmt.get(membership.memberId, offerId)),
+    offer.redemptionCadence
   );
   if (!entitlement) {
     logRedemptionEvent({
@@ -1040,7 +989,8 @@ const redeemTxn = db.transaction(({ membershipToken, offerId, venueId, staffId, 
       offerId,
       venueId,
       redeemedAt: entitlement.redeemedAt,
-      nextResetAt: resetInfo.nextResetAt
+      redemptionCadence: offer.redemptionCadence,
+      nextResetAt: offer.redemptionCadence === "weekly" ? resetInfo.nextResetAt : null
     };
   }
 
@@ -1066,7 +1016,8 @@ const redeemTxn = db.transaction(({ membershipToken, offerId, venueId, staffId, 
     offerId,
     venueId,
     redeemedAt: currentIso,
-    nextResetAt: resetInfo.nextResetAt
+    redemptionCadence: offer.redemptionCadence,
+    nextResetAt: offer.redemptionCadence === "weekly" ? resetInfo.nextResetAt : null
   };
 });
 
@@ -1232,13 +1183,43 @@ function setOfferActive(offerId, isActive) {
   };
 }
 
-function updateOfferContent(offerId, { title, description, availableDays, startsAt, endsAt }) {
+function updateOfferContent(
+  offerId,
+  {
+    title,
+    description,
+    availableDays,
+    availableStartTime,
+    availableEndTime,
+    redemptionCadence,
+    startsAt,
+    endsAt
+  }
+) {
   const offer = mapOffer(findOfferByIdStmt.get(offerId));
   if (!offer) {
     return { ok: false, statusCode: 404, reason: "offer_not_found" };
   }
 
-  updateOfferContentStmt.run(title, description ?? null, serializeAvailableDays(availableDays), offerId);
+  const nextAvailableStartTime = availableStartTime !== undefined
+    ? availableStartTime
+    : offer.availableStartTime;
+  const nextAvailableEndTime = availableEndTime !== undefined
+    ? availableEndTime
+    : offer.availableEndTime;
+  const nextRedemptionCadence = redemptionCadence !== undefined
+    ? normalizeRedemptionCadence(redemptionCadence)
+    : offer.redemptionCadence;
+
+  updateOfferContentStmt.run(
+    title,
+    description ?? null,
+    serializeAvailableDays(availableDays),
+    nextAvailableStartTime || null,
+    nextAvailableEndTime || null,
+    nextRedemptionCadence,
+    offerId
+  );
 
   const shouldUpdateSchedule = startsAt !== undefined || endsAt !== undefined;
   if (shouldUpdateSchedule) {

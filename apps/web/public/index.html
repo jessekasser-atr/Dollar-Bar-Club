@@ -483,6 +483,24 @@
               </div>
               <div class="schedule-help">Leave all unchecked to make the offer available every day.</div>
             </div>
+            <div class="grid" style="margin-top:10px;">
+              <div>
+                <label for="newOfferStartTime">Daily Start Time (Optional)</label>
+                <input id="newOfferStartTime" type="time" />
+              </div>
+              <div>
+                <label for="newOfferEndTime">Daily End Time (Optional)</label>
+                <input id="newOfferEndTime" type="time" />
+              </div>
+              <div>
+                <label for="newOfferRedemptionCadence">Redemption Limit</label>
+                <select id="newOfferRedemptionCadence">
+                  <option value="weekly">Once per member each week</option>
+                  <option value="once">Once per member ever</option>
+                </select>
+              </div>
+            </div>
+            <div class="schedule-help">Times use Austin local time. Set both times or leave both blank for all-day availability. Overnight windows such as 10:00 PM–2:00 AM are supported.</div>
             <div class="card-actions" style="margin-top:14px;">
               <button id="createOfferBtn">Create Offer</button>
             </div>

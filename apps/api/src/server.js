@@ -34,6 +34,11 @@ import {
 } from "./db.js";
 import { getBarglanceApiKey } from "./barglance.js";
 import { isApnsConfigured, sendApnsNotification } from "./notifications.js";
+import {
+  isValidRedemptionCadence,
+  normalizeRedemptionCadence,
+  validateDailyTimeWindow
+} from "./offer-rules.js";
 
 const app = express();
 app.use(express.json());
@@ -325,7 +330,18 @@ app.get("/offers/active", (req, res) => {
 });
 
 app.post("/offers", requireAdminAccess, (req, res) => {
-  const { id, venueId, title, description, imageUrl, isActive, availableDays } = req.body || {};
+  const {
+    id,
+    venueId,
+    title,
+    description,
+    imageUrl,
+    isActive,
+    availableDays,
+    availableStartTime,
+    availableEndTime,
+    redemptionCadence
+  } = req.body || {};
 
   const normalizedId = String(id || "").trim();
   const normalizedVenueId = String(venueId || "").trim();
@@ -333,6 +349,16 @@ app.post("/offers", requireAdminAccess, (req, res) => {
 
   if (!normalizedId || !normalizedVenueId || !normalizedTitle) {
     return res.status(400).json({ ok: false, reason: "offer_fields_required" });
+  }
+
+  const dailyWindow = validateDailyTimeWindow(availableStartTime, availableEndTime);
+  if (!dailyWindow.ok) {
+    return res.status(400).json({ ok: false, reason: dailyWindow.reason });
+  }
+
+  const normalizedCadence = normalizeRedemptionCadence(redemptionCadence);
+  if (redemptionCadence !== undefined && !isValidRedemptionCadence(redemptionCadence)) {
+    return res.status(400).json({ ok: false, reason: "redemption_cadence_invalid" });
   }
 
   const result = createOffer({
@@ -344,7 +370,10 @@ app.post("/offers", requireAdminAccess, (req, res) => {
     startsAt: "2000-01-01T00:00:00.000Z",
     endsAt: "2099-12-31T23:59:59.000Z",
     isActive: isActive !== false,
-    availableDays: normalizeAvailableDays(availableDays)
+    availableDays: normalizeAvailableDays(availableDays),
+    availableStartTime: dailyWindow.availableStartTime,
+    availableEndTime: dailyWindow.availableEndTime,
+    redemptionCadence: normalizedCadence
   });
 
   if (!result.ok) {
@@ -393,7 +422,16 @@ function parseDateInput(value, fieldName) {
 }
 
 app.post("/admin/offers/:id/content", requireAdminAccess, (req, res) => {
-  const { title, description, availableDays, startsAt, endsAt } = req.body || {};
+  const {
+    title,
+    description,
+    availableDays,
+    availableStartTime,
+    availableEndTime,
+    redemptionCadence,
+    startsAt,
+    endsAt
+  } = req.body || {};
 
   if (!title || typeof title !== "string" || !title.trim()) {
     return res.status(400).json({ ok: false, reason: "title_required" });
@@ -415,10 +453,29 @@ app.post("/admin/offers/:id/content", requireAdminAccess, (req, res) => {
     return res.status(400).json({ ok: false, reason: "ends_before_starts" });
   }
 
+  let dailyWindow = { availableStartTime: undefined, availableEndTime: undefined };
+  if (availableStartTime !== undefined || availableEndTime !== undefined) {
+    dailyWindow = validateDailyTimeWindow(availableStartTime, availableEndTime);
+    if (!dailyWindow.ok) {
+      return res.status(400).json({ ok: false, reason: dailyWindow.reason });
+    }
+  }
+
+  let normalizedCadence;
+  if (redemptionCadence !== undefined) {
+    if (!isValidRedemptionCadence(redemptionCadence)) {
+      return res.status(400).json({ ok: false, reason: "redemption_cadence_invalid" });
+    }
+    normalizedCadence = normalizeRedemptionCadence(redemptionCadence);
+  }
+
   const result = updateOfferContent(req.params.id, {
     title: title.trim(),
     description: description != null ? String(description).trim() || null : null,
     availableDays: normalizeAvailableDays(availableDays),
+    availableStartTime: dailyWindow.availableStartTime,
+    availableEndTime: dailyWindow.availableEndTime,
+    redemptionCadence: normalizedCadence,
     startsAt: parsedStart.value,
     endsAt: parsedEnd.value
   });
@@ -486,7 +543,7 @@ app.post("/redeem", redeemRateLimiter, (req, res) => {
 
     return res.json({
       ...result,
-      weeklyReset: getWeeklyResetInfo()
+      weeklyReset: result.redemptionCadence === "weekly" ? getWeeklyResetInfo() : null
     });
   } catch (err) {
     console.error("Redeem error:", err);

@@ -28,8 +28,8 @@ Dollar Bar Club is a BarGlance product. The public DBC experience sits on top of
 
 ## Product Goals
 
-- On-site drink redemption with once-per-week, per-offer validation
-- Per-offer weekday scheduling so bars can run specials only on selected days
+- On-site drink redemption with a per-offer limit of once per week or once per member ever
+- Per-offer weekday and Austin-time scheduling so bars can control the days and hours when specials run
 - Fast setup for Austin pilot bars
 - Basic internal operator/admin workflows
 - Clear audit trail of redemptions
@@ -176,7 +176,9 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 - Venue browsing and venue detail views
 - Geolocation-based redemption
 - Weekly offer resets every Sunday at `12:00 AM` Austin time
-- Offer availability states for `Available today`, `Scheduled`, and `Redeemed this week`
+- Optional recurring daily time windows in Austin time, including overnight windows
+- Offer availability states for available now, later today, ended today, scheduled, and redeemed
+- Weekly and one-time-per-member redemption modes
 - PWA installability
 - Shared codebase with the live iOS App Store release (via Capacitor)
 
@@ -195,17 +197,17 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 - Membership issuance and login
 - Venue and offer retrieval
 - Entitlement management
-- Weekly redemption enforcement per member, per offer, with Sunday-midnight Austin resets
-- Per-offer weekday availability enforcement using Austin local time
+- Configurable weekly or once-ever redemption enforcement per member and offer
+- Per-offer weekday and daily-hour availability enforcement using Austin local time
 - BarGlance API sync support for venue/bar population
 
 ## Pilot Redemption Flow
 
 1. Member opens the member app and claims a pass with email plus Austin ZIP, or signs in with email.
-2. Member browses enabled venues and sees whether an offer is available today, scheduled for other days, or already redeemed this week.
+2. Member browses enabled venues and sees whether an offer is available now, scheduled for another day or time, or already redeemed under its weekly or once-ever limit.
 3. Member selects an eligible live offer and taps "Redeem now"; the app verifies on-site presence via geolocation.
-4. The API validates active membership, active offer, whether the offer is scheduled for the current Austin weekday, and whether that offer has already been redeemed during the current Austin week.
-5. The API records the redemption with venue and audit metadata, then keeps that offer locked until the next Sunday `12:00 AM` Austin reset.
+4. The API validates active membership, active offer, the current Austin weekday and time window, and the offer's configured redemption cadence.
+5. The API records the redemption with venue and audit metadata, then keeps that offer locked until the next Sunday `12:00 AM` Austin reset or permanently when it is a one-time offer.
 6. Member shows the confirmation screen to the bartender or server.
 
 ## API Endpoints
@@ -220,7 +222,7 @@ Render deploys from the repo root via public repo URL. Runs the Express backend 
 | `GET` | `/offers/active` | None | Query: `venueId`, optional `membershipToken` |
 | `GET` | `/venues` | None | Returns enabled pilot venues only |
 | `GET` | `/venues/:id` | None | Venue with offers, optional `membershipToken` enrichment |
-| `POST` | `/redeem` | Rate limited | Redeem an offer once per Austin week (`Sunday 12:00 AM` reset) |
+| `POST` | `/redeem` | Rate limited | Redeem an offer according to its weekly or once-ever member limit |
 | `POST` | `/memberships/devices` | None | Register an iOS APNs device token. Body: `{ membershipToken, deviceToken, platform }` |
 | `DELETE` | `/memberships/devices` | None | Revoke a device token. Body: `{ membershipToken?, deviceToken }` |
 
@@ -239,8 +241,8 @@ All admin routes require the `X-Admin-Key` header.
 | `POST` | `/admin/venues/:id/profile` | Update curated display overrides |
 | `POST` | `/admin/venues/:id/profile/reset` | Clear curated display overrides |
 | `GET` | `/admin/offers` | List all offers |
-| `POST` | `/offers` | Create offer, optional weekday schedule, and backfill entitlements |
-| `POST` | `/admin/offers/:id/content` | Update offer title, description, and weekday schedule |
+| `POST` | `/offers` | Create offer with optional weekday/time schedule and redemption cadence, then backfill entitlements |
+| `POST` | `/admin/offers/:id/content` | Update offer content, schedule, active date range, and redemption cadence |
 | `POST` | `/admin/offers/:id/active` | Toggle offer active state |
 | `DELETE` | `/admin/offers/:id` | Delete offer and related entitlements |
 | `POST` | `/admin/sync/barglance` | Sync venues from BarGlance |
@@ -379,7 +381,7 @@ The iOS build and upload pipeline runs via GitHub Actions (`.github/workflows/io
 - CORS: allowlisted via `ALLOWED_ORIGINS` (Capacitor WebView origins are always included automatically)
 - Admin auth: shared `ADMIN_ACCESS_KEY` gate — the admin console prompts for it before loading, API routes validate via `X-Admin-Key` header
 - Member app API base: `/api` in production through Vercel rewrite; `https://dbc-api.onrender.com` for the native iOS app
-- Weekly offer reset: each member can redeem each offer once per Austin week; the reset boundary is Sunday at `12:00 AM` in `America/Chicago`
+- Redemption cadence: each offer is either redeemable once per Austin week or once per member ever; weekly resets occur Sunday at `12:00 AM` in `America/Chicago`
 - Venue profile source of truth:
   - BarGlance sync provides the base venue data layer
   - Curated profile override fields replace the base layer for member-facing display
@@ -389,6 +391,8 @@ The iOS build and upload pipeline runs via GitHub Actions (`.github/workflows/io
 - Offer schedules:
   - No `availableDays` selected means the offer is available every day
   - One or more selected weekdays means the offer is only available on those Austin weekdays
+  - No daily start/end time means the offer is available all day on its selected weekdays
+  - A daily start/end time limits redemption to that recurring Austin-time window; windows may cross midnight and belong to the weekday on which they start
 
 ## Database
 

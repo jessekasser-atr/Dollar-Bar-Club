@@ -327,6 +327,19 @@ const migrations = [
         "CREATE INDEX idx_member_devices_active ON member_devices(revoked_at)"
       );
     }
+  },
+  {
+    id: "010_offer_time_windows_and_redemption_cadence",
+    run(db) {
+      ensureColumn(db, "offers", "available_start_time", "available_start_time TEXT");
+      ensureColumn(db, "offers", "available_end_time", "available_end_time TEXT");
+      ensureColumn(
+        db,
+        "offers",
+        "redemption_cadence",
+        "redemption_cadence TEXT NOT NULL DEFAULT 'weekly'"
+      );
+    }
   }
 ];
 

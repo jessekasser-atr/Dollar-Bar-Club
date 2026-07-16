@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS offers (
   ends_at TEXT NOT NULL,
   max_redemptions INTEGER,
   is_active INTEGER NOT NULL DEFAULT 1,
+  available_days TEXT,
+  available_start_time TEXT,
+  available_end_time TEXT,
+  redemption_cadence TEXT NOT NULL DEFAULT 'weekly',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (venue_id) REFERENCES venues(id)
 );

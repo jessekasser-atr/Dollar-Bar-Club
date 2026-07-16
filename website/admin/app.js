@@ -129,6 +129,9 @@ function renderOpsApp() {
     newOfferImageUrlEl: document.getElementById("newOfferImageUrl"),
     newOfferDescriptionEl: document.getElementById("newOfferDescription"),
     newOfferDaysEl: document.getElementById("newOfferDays"),
+    newOfferStartTimeEl: document.getElementById("newOfferStartTime"),
+    newOfferEndTimeEl: document.getElementById("newOfferEndTime"),
+    newOfferRedemptionCadenceEl: document.getElementById("newOfferRedemptionCadence"),
     selectedVenueSummaryEl: document.getElementById("selectedVenueSummary"),
     offerCreateStatusEl: document.getElementById("offerCreateStatus"),
     saveVenueProfileBtn: document.getElementById("saveVenueProfileBtn"),
@@ -467,6 +470,10 @@ function normalizeAvailableDays(value) {
 }
 
 function formatOfferSchedule(offer) {
+  if (offer?.availabilitySummary) {
+    return offer.availabilitySummary;
+  }
+
   const days = normalizeAvailableDays(offer.availableDays);
   if (!days.length) {
     return "Every day";
@@ -474,6 +481,10 @@ function formatOfferSchedule(offer) {
   return days
     .map((day) => WEEKDAY_OPTIONS.find((entry) => entry.value === day)?.fullLabel || String(day))
     .join(", ");
+}
+
+function formatRedemptionCadence(value) {
+  return value === "once" ? "Once per member ever" : "Once per member each week";
 }
 
 function getCheckedDays(container) {
@@ -630,7 +641,7 @@ function offerAdminCard(offer) {
   const expired = isOfferExpired(offer);
   const scheduledPill = expired
     ? `<span class="pill" style="background:#fde2e2;color:#c62828;">Expired ${escapeHtml(offer.endsAt ? new Date(offer.endsAt).toLocaleDateString() : "")}</span>`
-    : `<span class="pill pill-accent">${escapeHtml(offer.isAvailableToday ? "Available Today" : "Scheduled")}</span>`;
+    : `<span class="pill pill-accent">${escapeHtml((offer.isAvailableNow ?? offer.isAvailableToday) ? "Available Now" : "Scheduled")}</span>`;
   wrap.innerHTML = `
     <div class="pill-row">
       <span class="pill ${offer.isActive ? "pill-ok" : "pill-muted"}">${offer.isActive ? "Active" : "Inactive"}</span>
@@ -645,6 +656,7 @@ function offerAdminCard(offer) {
     </p>
     <p style="margin-top:6px;color:#5c6675;">
       <strong>Available:</strong> ${escapeHtml(formatOfferSchedule(offer))} |
+      <strong>Redemption:</strong> ${escapeHtml(formatRedemptionCadence(offer.redemptionCadence))} |
       <strong>Window:</strong> ${escapeHtml(offer.startsAt ? new Date(offer.startsAt).toLocaleDateString() : "—")}
       &rarr; ${escapeHtml(offer.endsAt ? new Date(offer.endsAt).toLocaleDateString() : "—")}
     </p>
@@ -677,6 +689,40 @@ function offerAdminCard(offer) {
 
     const daySelector = buildDaySelector(offer.availableDays || []);
     daySelector.style.marginBottom = "6px";
+
+    const dailyTimeLabel = document.createElement("div");
+    dailyTimeLabel.textContent = "Daily hours (Austin time)";
+    dailyTimeLabel.style.cssText = "margin:8px 0 6px;font-size:12px;font-weight:600;color:#5c6675;";
+
+    const dailyTimeRow = document.createElement("div");
+    dailyTimeRow.style.cssText = "display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;";
+
+    const dailyStartInput = document.createElement("input");
+    dailyStartInput.type = "time";
+    dailyStartInput.value = offer.availableStartTime || "";
+    dailyStartInput.title = "Daily start time in Austin";
+    dailyStartInput.style.cssText = "flex:1;min-width:150px;padding:4px 6px;";
+
+    const dailyEndInput = document.createElement("input");
+    dailyEndInput.type = "time";
+    dailyEndInput.value = offer.availableEndTime || "";
+    dailyEndInput.title = "Daily end time in Austin";
+    dailyEndInput.style.cssText = "flex:1;min-width:150px;padding:4px 6px;";
+
+    dailyTimeRow.appendChild(dailyStartInput);
+    dailyTimeRow.appendChild(dailyEndInput);
+
+    const cadenceLabel = document.createElement("div");
+    cadenceLabel.textContent = "Redemption limit";
+    cadenceLabel.style.cssText = "margin:8px 0 6px;font-size:12px;font-weight:600;color:#5c6675;";
+
+    const cadenceSelect = document.createElement("select");
+    cadenceSelect.innerHTML = `
+      <option value="weekly">Once per member each week</option>
+      <option value="once">Once per member ever</option>
+    `;
+    cadenceSelect.value = offer.redemptionCadence === "once" ? "once" : "weekly";
+    cadenceSelect.style.cssText = "width:100%;margin-bottom:6px;padding:4px 6px;";
 
     const windowLabel = document.createElement("div");
     windowLabel.textContent = "Active window (local time)";
@@ -720,8 +766,12 @@ function offerAdminCard(offer) {
     descEl.replaceWith(descInput);
     descInput.insertAdjacentElement("afterend", daySelector);
     daySelector.insertAdjacentElement("beforebegin", scheduleLabel);
-    daySelector.insertAdjacentElement("afterend", windowRow);
-    windowRow.insertAdjacentElement("beforebegin", windowLabel);
+    daySelector.insertAdjacentElement("afterend", dailyTimeLabel);
+    dailyTimeLabel.insertAdjacentElement("afterend", dailyTimeRow);
+    dailyTimeRow.insertAdjacentElement("afterend", cadenceLabel);
+    cadenceLabel.insertAdjacentElement("afterend", cadenceSelect);
+    cadenceSelect.insertAdjacentElement("afterend", windowLabel);
+    windowLabel.insertAdjacentElement("afterend", windowRow);
     titleInput.focus();
 
     editBtn.textContent = "Save";
@@ -736,6 +786,10 @@ function offerAdminCard(offer) {
     editBtn.addEventListener("click", async () => {
       const newTitle = titleInput.value.trim();
       if (!newTitle) { titleInput.focus(); return; }
+      if (Boolean(dailyStartInput.value) !== Boolean(dailyEndInput.value)) {
+        renderResult(false, { ok: false, reason: "daily_time_window_incomplete" });
+        return;
+      }
       editBtn.disabled = true;
       cancelBtn.disabled = true;
       try {
@@ -748,6 +802,9 @@ function offerAdminCard(offer) {
             title: newTitle,
             description: descInput.value.trim() || null,
             availableDays: getCheckedDays(daySelector),
+            availableStartTime: dailyStartInput.value || null,
+            availableEndTime: dailyEndInput.value || null,
+            redemptionCadence: cadenceSelect.value,
             startsAt: startsAtIso,
             endsAt: endsAtIso
           })
@@ -1218,9 +1275,16 @@ function bindEvents() {
     const description = ui.newOfferDescriptionEl.value.trim();
     const imageUrl = ui.newOfferImageUrlEl.value.trim();
     const availableDays = getCheckedDays(ui.newOfferDaysEl);
+    const availableStartTime = ui.newOfferStartTimeEl.value;
+    const availableEndTime = ui.newOfferEndTimeEl.value;
+    const redemptionCadence = ui.newOfferRedemptionCadenceEl.value;
 
     if (!id || !venueId || !title) {
       renderResult(false, { ok: false, reason: "offer_fields_required" });
+      return;
+    }
+    if (Boolean(availableStartTime) !== Boolean(availableEndTime)) {
+      renderResult(false, { ok: false, reason: "daily_time_window_incomplete" });
       return;
     }
 
@@ -1239,7 +1303,10 @@ function bindEvents() {
           title,
           description: description || undefined,
           imageUrl: imageUrl || undefined,
-          availableDays
+          availableDays,
+          availableStartTime: availableStartTime || null,
+          availableEndTime: availableEndTime || null,
+          redemptionCadence
         })
       });
 
@@ -1247,6 +1314,9 @@ function bindEvents() {
       ui.newOfferImageUrlEl.value = "";
       ui.newOfferDescriptionEl.value = "";
       setCheckedDays(ui.newOfferDaysEl, []);
+      ui.newOfferStartTimeEl.value = "";
+      ui.newOfferEndTimeEl.value = "";
+      ui.newOfferRedemptionCadenceEl.value = "weekly";
       ui.offerCreateStatusEl.style.color = "#107c41";
       ui.offerCreateStatusEl.textContent = `Created: ${data.offer.title} for ${data.offer.venueId} (${formatOfferSchedule(data.offer)}).`;
       await loadAdminOffers();

@@ -635,14 +635,29 @@ function isOfferExpired(offer) {
   return Number.isFinite(endsAtMs) && endsAtMs < Date.now();
 }
 
+function isOpenEndedOfferWindow(offer) {
+  const startsAt = offer?.startsAt ? new Date(offer.startsAt) : null;
+  const endsAt = offer?.endsAt ? new Date(offer.endsAt) : null;
+  return Boolean(
+    startsAt && !Number.isNaN(startsAt.getTime()) &&
+    endsAt && !Number.isNaN(endsAt.getTime()) &&
+    startsAt.getFullYear() <= 2000 &&
+    endsAt.getFullYear() >= 2099
+  );
+}
+
 function getInferredActiveWindow(offer) {
+  if (isOpenEndedOfferWindow(offer)) {
+    return { startsAt: null, endsAt: null, isOpenEnded: true };
+  }
+
   const rawStart = offer?.startsAt ? new Date(offer.startsAt) : null;
   const rawEnd = offer?.endsAt ? new Date(offer.endsAt) : null;
   if (
     !rawStart || Number.isNaN(rawStart.getTime()) ||
     !rawEnd || Number.isNaN(rawEnd.getTime())
   ) {
-    return { startsAt: rawStart, endsAt: rawEnd };
+    return { startsAt: rawStart, endsAt: rawEnd, isOpenEnded: false };
   }
 
   const currentYear = new Date().getFullYear();
@@ -676,7 +691,7 @@ function getInferredActiveWindow(offer) {
     rawEnd.getMinutes()
   );
 
-  return { startsAt, endsAt };
+  return { startsAt, endsAt, isOpenEnded: false };
 }
 
 function offerAdminCard(offer) {
@@ -702,8 +717,9 @@ function offerAdminCard(offer) {
     <p style="margin-top:6px;color:#5c6675;">
       <strong>Available:</strong> ${escapeHtml(formatOfferSchedule(offer))} |
       <strong>Redemption:</strong> ${escapeHtml(formatRedemptionCadence(offer.redemptionCadence))} |
-      <strong>Window:</strong> ${escapeHtml(inferredWindow.startsAt ? inferredWindow.startsAt.toLocaleDateString() : "—")}
-      &rarr; ${escapeHtml(inferredWindow.endsAt ? inferredWindow.endsAt.toLocaleDateString() : "—")}
+      <strong>Window:</strong> ${inferredWindow.isOpenEnded
+        ? "Always active"
+        : `${escapeHtml(inferredWindow.startsAt ? inferredWindow.startsAt.toLocaleDateString() : "—")} &rarr; ${escapeHtml(inferredWindow.endsAt ? inferredWindow.endsAt.toLocaleDateString() : "—")}`}
     </p>
   `;
 
@@ -770,7 +786,7 @@ function offerAdminCard(offer) {
     cadenceSelect.style.cssText = "width:100%;margin-bottom:6px;padding:4px 6px;";
 
     const windowLabel = document.createElement("div");
-    windowLabel.textContent = "Active window (current year; end rolls into next year when needed)";
+    windowLabel.textContent = "Active date window (optional)";
     windowLabel.style.cssText = "margin:8px 0 6px;font-size:12px;font-weight:600;color:#5c6675;";
 
     const windowRow = document.createElement("div");
@@ -794,26 +810,12 @@ function offerAdminCard(offer) {
     endsInput.value = toDatetimeLocal(inferredWindow.endsAt);
     endsInput.style.cssText = "flex:1;min-width:180px;padding:4px 6px;";
 
-    const oneYearBtn = document.createElement("button");
-    oneYearBtn.type = "button";
-    oneYearBtn.className = "secondary";
-    oneYearBtn.textContent = "One-year window";
-    oneYearBtn.style.cssText = "font-size:12px;padding:4px 8px;";
-    oneYearBtn.addEventListener("click", () => {
-      const start = startsInput.value ? new Date(startsInput.value) : null;
-      if (!start || Number.isNaN(start.getTime())) {
-        startsInput.focus();
-        return;
-      }
-      const end = new Date(start);
-      end.setFullYear(end.getFullYear() + 1);
-      end.setMinutes(end.getMinutes() - 1);
-      endsInput.value = toDatetimeLocal(end);
-    });
+    const windowHelp = document.createElement("div");
+    windowHelp.textContent = "Always-active offers leave these blank. For seasonal windows, the start uses the current year and an earlier end date rolls into next year.";
+    windowHelp.style.cssText = "margin:0 0 6px;font-size:12px;color:#5c6675;";
 
     windowRow.appendChild(startsInput);
     windowRow.appendChild(endsInput);
-    windowRow.appendChild(oneYearBtn);
 
     titleEl.replaceWith(titleInput);
     descEl.replaceWith(descInput);
@@ -825,6 +827,7 @@ function offerAdminCard(offer) {
     cadenceLabel.insertAdjacentElement("afterend", cadenceSelect);
     cadenceSelect.insertAdjacentElement("afterend", windowLabel);
     windowLabel.insertAdjacentElement("afterend", windowRow);
+    windowRow.insertAdjacentElement("afterend", windowHelp);
     titleInput.focus();
 
     editBtn.textContent = "Save";
